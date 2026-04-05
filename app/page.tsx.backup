@@ -1,0 +1,348 @@
+'use client'
+import { useState, useRef } from 'react'
+
+const questions = [
+  { cat: '음식/맛집', live: true,  q: '탕수육 부먹 vs 찍먹?',          a: '부먹',    ae: '🥘', b: '찍먹',       be: '🥣', pa: 38, n: 4088,  comments: 847,  likes: 1240 },
+  { cat: 'IT/제품',   live: false, q: '아이폰 vs 갤럭시?',              a: '아이폰',  ae: '🍎', b: '갤럭시',     be: '🤖', pa: 54, n: 11101, comments: 3891, likes: 4200 },
+  { cat: '핫이슈',    live: true,  q: '효도르 vs 현재 중딩 10명?',       a: '효도르',  ae: '🥊', b: '중딩 10명',  be: '👦', pa: 61, n: 21472, comments: 9042, likes: 8900 },
+  { cat: '직장/커리어',live: true, q: '재택근무 vs 출근 평생?',          a: '재택근무',ae: '🏠', b: '출근',       be: '🏢', pa: 74, n: 6877,  comments: 1987, likes: 2100 },
+  { cat: '부동산',    live: false, q: '서울 집 vs 지방 현금 10억?',      a: '서울 집', ae: '🏙️', b: '현금 10억',  be: '💰', pa: 44, n: 13428, comments: 4518, likes: 4100 },
+  { cat: '연애',      live: true,  q: '먼저 고백 vs 기다리기?',          a: '먼저 고백',ae: '💌', b: '기다리기',  be: '🤐', pa: 52, n: 12412, comments: 5872, likes: 3900 },
+  { cat: '음식/맛집', live: false, q: '치킨 vs 피자 야식?',              a: '치킨',    ae: '🍗', b: '피자',       be: '🍕', pa: 67, n: 7551,  comments: 1203, likes: 2310 },
+  { cat: '핫이슈',    live: true,  q: '결혼 vs 비혼?',                   a: '결혼',    ae: '💍', b: '비혼',       be: '🙅', pa: 41, n: 17313, comments: 8103, likes: 6200 },
+  { cat: '직장/커리어',live: false,q: '대기업 vs 스타트업?',             a: '대기업',  ae: '🏢', b: '스타트업',   be: '🚀', pa: 71, n: 7424,  comments: 2104, likes: 1900 },
+  { cat: '부동산',    live: true,  q: '한국 살기 vs 해외 이민?',          a: '한국',    ae: '🇰🇷', b: '해외 이민', be: '✈️', pa: 38, n: 6824,  comments: 2954, likes: 1800 },
+]
+
+const sampleComments = [
+  { side: 'a', av: '부', name: '부먹교주', badge: '부먹파', text: '촉촉+바삭 공존이 진화임. 찍먹은 소극적 선택.', lk: 431, t: '1시간 전' },
+  { side: 'b', av: '찍', name: '찍먹러버', badge: '찍먹파', text: '부먹하면 남은 거 다 눅눅해짐. 찍먹이 과학임.', lk: 847, t: '2시간 전' },
+  { side: 'n', av: '?',  name: '중립지대', badge: '중립',   text: '혼자 먹을 땐 찍먹, 같이 먹을 땐 부먹. TPO 문제.', lk: 389, t: '5시간 전' },
+  { side: 'a', av: '부', name: '부먹왕',   badge: '부먹파', text: '중식당 셰프도 부먹 추천함. 정통 방식임.', lk: 592, t: '3시간 전' },
+  { side: 'b', av: '찍', name: '논리왕',   badge: '찍먹파', text: '중국에 탕수육 없음 ㅋㅋ 정통 따위 없다.', lk: 1024, t: '30분 전' },
+]
+
+function fmt(n: number) {
+  return n >= 10000 ? (n / 10000).toFixed(1) + '만' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : '' + n
+}
+
+export default function FeedPage() {
+  const [cur, setCur] = useState(0)
+  const [voted, setVoted] = useState<Record<number, 'a' | 'b'>>({})
+  const [liked, setLiked] = useState<Record<number, boolean>>({})
+  const [commentOpen, setCommentOpen] = useState(false)
+  const [statOpen, setStatOpen] = useState(false)
+  const [commentSide, setCommentSide] = useState<'a' | 'b' | null>(null)
+  const [commentText, setCommentText] = useState('')
+  const [comments, setComments] = useState(sampleComments)
+  const [commentFilter, setCommentFilter] = useState<'all' | 'a' | 'b'>('all')
+  const touchStartY = useRef(0)
+  const isAnim = useRef(false)
+
+  const q = questions[cur]
+  const v = voted[cur]
+  const isLiked = liked[cur]
+
+  function doVote(side: 'a' | 'b') {
+    if (voted[cur]) return
+    setVoted(prev => ({ ...prev, [cur]: side }))
+    setTimeout(() => goNext(), 1600)
+  }
+
+  function goNext() {
+    if (isAnim.current) return
+    isAnim.current = true
+    setCur(i => (i + 1) % questions.length)
+    setTimeout(() => { isAnim.current = false }, 400)
+  }
+
+  function doLike() {
+    setLiked(prev => ({ ...prev, [cur]: !prev[cur] }))
+  }
+
+  function sendComment() {
+    if (!commentText.trim() || !commentSide) return
+    const newC = {
+      side: commentSide,
+      av: commentSide === 'a' ? q.ae : q.be,
+      name: '나',
+      badge: commentSide === 'a' ? q.a + '파' : q.b + '파',
+      text: commentText,
+      lk: 0,
+      t: '방금',
+    }
+    setComments(prev => [newC, ...prev])
+    setCommentText('')
+  }
+
+  const filteredComments = commentFilter === 'all' ? comments : comments.filter(c => c.side === commentFilter)
+
+  return (
+    <div style={{
+      maxWidth: '390px', margin: '0 auto', height: '100vh',
+      background: '#0A0A0A', display: 'flex', flexDirection: 'column',
+      overflow: 'hidden', position: 'relative',
+      fontFamily: '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif',
+    }}>
+
+      {/* 상단바 */}
+      <div style={{ padding: '14px 20px 6px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <button onClick={() => window.history.back()} style={{
+          width: '32px', height: '32px', borderRadius: '50%',
+          background: 'rgba(255,255,255,0.1)', border: 'none', cursor: 'pointer',
+          color: 'white', fontSize: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>←</button>
+        <div style={{ fontSize: '16px', fontWeight: '900', letterSpacing: '-0.04em', color: 'white' }}>
+          VERSUS<span style={{ background: 'white', color: '#0A0A0A', fontSize: '8px', padding: '2px 4px', borderRadius: '3px', marginLeft: '4px', verticalAlign: 'middle' }}>VS</span>
+        </div>
+        <button onClick={() => goNext()} style={{
+          fontSize: '12px', fontWeight: '700', color: 'rgba(255,255,255,0.4)',
+          background: 'none', border: 'none', cursor: 'pointer',
+        }}>건너뛰기</button>
+      </div>
+
+      {/* 진행 카운터 */}
+      <div style={{ padding: '0 20px 8px', display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        <span style={{ fontSize: '11px', fontWeight: '800', color: 'rgba(255,255,255,0.5)' }}>{cur + 1} / {questions.length}</span>
+        <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)' }}>·</span>
+        {q.live && <span style={{ fontSize: '11px', fontWeight: '700', color: '#FF3B3B' }}>● {(Math.floor(Math.random() * 900) + 600).toLocaleString()}명 투표 중</span>}
+      </div>
+
+      {/* 슬라이드 영역 */}
+      <div
+        style={{ flex: 1, padding: '4px 16px 10px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+        onTouchStart={e => { touchStartY.current = e.touches[0].clientY }}
+        onTouchEnd={e => {
+          const dy = touchStartY.current - e.changedTouches[0].clientY
+          if (dy > 60) goNext()
+        }}
+      >
+        {/* 카테고리 */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '999px', padding: '4px 12px', marginBottom: '10px', alignSelf: 'flex-start' }}>
+          {q.live && <div style={{ width: '5px', height: '5px', borderRadius: '50%', background: '#FF3B3B' }}></div>}
+          <span style={{ fontSize: '11px', fontWeight: '700', color: 'rgba(255,255,255,0.75)', letterSpacing: '0.04em' }}>{q.cat}</span>
+        </div>
+
+        {/* 질문 */}
+        <div style={{ fontSize: '22px', fontWeight: '900', letterSpacing: '-0.04em', lineHeight: 1.25, color: 'white', marginBottom: '4px' }}>{q.q}</div>
+        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: '14px', fontWeight: '600' }}>
+          {fmt(q.n)}명 참여 · 댓글 {fmt(q.comments)}개
+        </div>
+
+        {/* 투표 옵션 */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', minHeight: 0 }}>
+          {[
+            { side: 'a' as const, name: q.a, emoji: q.ae, color: '#FF3B3B', bg: 'rgba(255,59,59,0.07)' },
+            { side: 'b' as const, name: q.b, emoji: q.be, color: '#1A6FFF', bg: 'rgba(26,111,255,0.07)' },
+          ].map(opt => {
+            const isVoted = v === opt.side
+            const isFaded = v && v !== opt.side
+            return (
+              <div key={opt.side} onClick={() => doVote(opt.side)} style={{
+                flex: 1, borderRadius: '20px', border: `1.5px solid ${isVoted ? opt.color : 'rgba(255,255,255,0.1)'}`,
+                background: isVoted ? `${opt.color}33` : opt.bg,
+                padding: '14px', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end',
+                cursor: 'pointer', opacity: isFaded ? 0.35 : 1,
+                transition: 'all 0.2s', position: 'relative', overflow: 'hidden', minHeight: 0,
+              }}>
+                <div style={{ fontSize: '28px', marginBottom: '6px' }}>{opt.emoji}</div>
+                <div style={{ fontSize: '9px', fontWeight: '900', letterSpacing: '0.12em', color: isVoted ? opt.color : 'rgba(255,255,255,0.2)', marginBottom: '4px' }}>{opt.side.toUpperCase()}</div>
+                <div style={{ fontSize: '18px', fontWeight: '900', letterSpacing: '-0.03em', color: 'white' }}>{opt.name}</div>
+                {v && (
+                  <div style={{ fontSize: '32px', fontWeight: '900', letterSpacing: '-0.05em', color: isVoted ? opt.color : 'rgba(255,255,255,0.35)', marginTop: '6px' }}>
+                    {opt.side === 'a' ? q.pa : 100 - q.pa}%
+                  </div>
+                )}
+                {v && <div style={{ position: 'absolute', bottom: 0, left: 0, height: '4px', background: opt.color, width: `${opt.side === 'a' ? q.pa : 100 - q.pa}%`, transition: 'width 0.9s cubic-bezier(.16,1,.3,1)', borderRadius: '0 0 20px 20px' }}></div>}
+              </div>
+            )
+          })}
+
+          {/* VS 구분선 */}
+          <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', width: '28px', height: '28px', background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '8px', fontWeight: '900', color: 'rgba(255,255,255,0.4)', pointerEvents: 'none' }}>VS</div>
+        </div>
+      </div>
+
+      {/* 하단 액션 버튼 */}
+      <div style={{ padding: '10px 20px 20px', display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+        {/* 좋아요 */}
+        <button onClick={doLike} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: isLiked ? 'rgba(255,59,59,0.25)' : 'rgba(255,255,255,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>
+            {isLiked ? '❤️' : '🤍'}
+          </div>
+          <span style={{ fontSize: '10px', fontWeight: '700', color: isLiked ? '#FF3B3B' : 'rgba(255,255,255,0.4)' }}>{fmt(q.likes + (isLiked ? 1 : 0))}</span>
+        </button>
+
+        {/* 댓글 */}
+        <button onClick={() => { setCommentOpen(true); setStatOpen(false) }} style={{
+          flex: 1, display: 'flex', alignItems: 'center', gap: '8px',
+          background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)',
+          borderRadius: '999px', padding: '9px 14px', cursor: 'pointer',
+        }}>
+          <span style={{ fontSize: '15px' }}>💬</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+            <span style={{ fontSize: '12px', fontWeight: '800', color: 'white', lineHeight: 1.2 }}>{v ? '댓글 달기' : '댓글 보기'}</span>
+            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.35)', fontWeight: '600' }}>{fmt(q.comments)}개 · 밀어올리기</span>
+          </div>
+        </button>
+
+        {/* 공유 */}
+        <button style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>↗️</div>
+          <span style={{ fontSize: '10px', fontWeight: '700', color: 'rgba(255,255,255,0.4)' }}>공유</span>
+        </button>
+
+        {/* 통계 */}
+        <button onClick={() => { setStatOpen(true); setCommentOpen(false) }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', background: 'none', border: 'none', cursor: 'pointer' }}>
+          <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: 'rgba(255,255,255,0.09)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>📊</div>
+          <span style={{ fontSize: '10px', fontWeight: '700', color: 'rgba(255,255,255,0.4)' }}>통계</span>
+        </button>
+      </div>
+
+      {/* ── 댓글 시트 ── */}
+      <div onClick={() => setCommentOpen(false)} style={{
+        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
+        opacity: commentOpen ? 1 : 0, pointerEvents: commentOpen ? 'all' : 'none',
+        transition: 'opacity 0.3s', zIndex: 9,
+      }}></div>
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0,
+        background: 'white', borderRadius: '24px 24px 0 0',
+        transform: commentOpen ? 'translateY(0)' : 'translateY(100%)',
+        transition: 'transform 0.42s cubic-bezier(.16,1,.3,1)',
+        zIndex: 10, display: 'flex', flexDirection: 'column', height: '75%',
+      }}>
+        <div onClick={() => setCommentOpen(false)} style={{ width: '36px', height: '4px', background: '#E8E8E8', borderRadius: '999px', margin: '12px auto 0', cursor: 'pointer', flexShrink: 0 }}></div>
+        <div style={{ padding: '10px 16px', borderBottom: '0.5px solid #E8E8E8', flexShrink: 0 }}>
+          <div style={{ fontSize: '13px', fontWeight: '700', color: '#0A0A0A', marginBottom: '6px' }}>{q.q}</div>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            {['전체', q.a + '파', q.b + '파'].map((f, i) => (
+              <button key={i} onClick={() => setCommentFilter(i === 0 ? 'all' : i === 1 ? 'a' : 'b')} style={{
+                fontSize: '11px', fontWeight: '700', padding: '4px 10px', borderRadius: '999px', cursor: 'pointer',
+                border: '1.5px solid',
+                borderColor: commentFilter === (i === 0 ? 'all' : i === 1 ? 'a' : 'b') ? (i === 1 ? '#FF3B3B' : i === 2 ? '#1A6FFF' : '#0A0A0A') : '#E8E8E8',
+                background: commentFilter === (i === 0 ? 'all' : i === 1 ? 'a' : 'b') ? (i === 1 ? '#FFF0F0' : i === 2 ? '#EEF4FF' : '#0A0A0A') : 'white',
+                color: commentFilter === (i === 0 ? 'all' : i === 1 ? 'a' : 'b') ? (i === 1 ? '#FF3B3B' : i === 2 ? '#1A6FFF' : 'white') : '#888',
+              }}>{i === 0 ? '전체' : i === 1 ? `🔴 ${q.a}파` : `🔵 ${q.b}파`}</button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '0 16px 8px' }}>
+          {filteredComments.map((c, i) => (
+            <div key={i} style={{ borderLeft: `2.5px solid ${c.side === 'a' ? '#FF3B3B' : c.side === 'b' ? '#1A6FFF' : '#E8E8E8'}`, padding: '10px 0 10px 12px', marginBottom: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                <div style={{ width: '22px', height: '22px', borderRadius: '50%', background: c.side === 'a' ? '#FFD0D0' : c.side === 'b' ? '#C8DCFF' : '#E8E8E8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '10px', fontWeight: '800', color: c.side === 'a' ? '#FF3B3B' : c.side === 'b' ? '#1A6FFF' : '#888' }}>{c.av}</div>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: '#0A0A0A' }}>{c.name}</span>
+                <span style={{ fontSize: '9px', fontWeight: '800', padding: '2px 7px', borderRadius: '999px', background: c.side === 'a' ? '#FFF0F0' : c.side === 'b' ? '#EEF4FF' : '#F5F5F5', color: c.side === 'a' ? '#FF3B3B' : c.side === 'b' ? '#1A6FFF' : '#888' }}>{c.badge}</span>
+                <span style={{ fontSize: '10px', color: '#C0C0C0', marginLeft: 'auto' }}>{c.t}</span>
+              </div>
+              <div style={{ fontSize: '13px', lineHeight: 1.55, color: '#444' }}>{c.text}</div>
+              <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+                <button style={{ fontSize: '11px', color: '#888', background: 'none', border: 'none', cursor: 'pointer' }}>♥ {fmt(c.lk)}</button>
+                <button style={{ fontSize: '11px', color: '#888', background: 'none', border: 'none', cursor: 'pointer' }}>답글</button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: '8px 16px 20px', borderTop: '0.5px solid #E8E8E8', flexShrink: 0 }}>
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+            {['a', 'b'].map(s => (
+              <button key={s} onClick={() => setCommentSide(s as 'a' | 'b')} style={{
+                flex: 1, padding: '7px', borderRadius: '12px', cursor: 'pointer', fontSize: '11px', fontWeight: '700',
+                border: `1.5px solid ${commentSide === s ? (s === 'a' ? '#FF3B3B' : '#1A6FFF') : '#E8E8E8'}`,
+                background: commentSide === s ? (s === 'a' ? '#FFF0F0' : '#EEF4FF') : 'white',
+                color: commentSide === s ? (s === 'a' ? '#FF3B3B' : '#1A6FFF') : '#888',
+              }}>{s === 'a' ? `🔴 ${q.a}파로` : `🔵 ${q.b}파로`}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <input value={commentText} onChange={e => setCommentText(e.target.value)} placeholder="댓글 입력..." style={{ flex: 1, border: '1px solid #E8E8E8', borderRadius: '999px', padding: '9px 14px', fontSize: '13px', outline: 'none', background: '#F5F5F5' }} />
+            <button onClick={sendComment} style={{ width: '36px', height: '36px', borderRadius: '50%', border: 'none', cursor: 'pointer', fontSize: '14px', background: commentSide ? (commentSide === 'a' ? '#FF3B3B' : '#1A6FFF') : '#E8E8E8', color: commentSide ? 'white' : '#888' }}>↑</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── 통계 시트 ── */}
+      <div onClick={() => setStatOpen(false)} style={{
+        position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)',
+        opacity: statOpen ? 1 : 0, pointerEvents: statOpen ? 'all' : 'none',
+        transition: 'opacity 0.3s', zIndex: 9,
+      }}></div>
+      <div style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0,
+        background: 'white', borderRadius: '24px 24px 0 0',
+        transform: statOpen ? 'translateY(0)' : 'translateY(100%)',
+        transition: 'transform 0.42s cubic-bezier(.16,1,.3,1)',
+        zIndex: 10, display: 'flex', flexDirection: 'column', height: '75%',
+      }}>
+        <div onClick={() => setStatOpen(false)} style={{ width: '36px', height: '4px', background: '#E8E8E8', borderRadius: '999px', margin: '12px auto 0', cursor: 'pointer', flexShrink: 0 }}></div>
+        <div style={{ padding: '14px 16px', borderBottom: '0.5px solid #E8E8E8', flexShrink: 0 }}>
+          <div style={{ fontSize: '15px', fontWeight: '900', color: '#0A0A0A', marginBottom: '10px' }}>{q.q}</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-around', marginBottom: '10px' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '2px' }}>{q.a}</div>
+              <div style={{ fontSize: '28px', fontWeight: '900', color: '#FF3B3B' }}>{q.pa}%</div>
+            </div>
+            <div style={{ fontSize: '12px', fontWeight: '900', color: '#C0C0C0' }}>VS</div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '11px', fontWeight: '700', color: '#888', marginBottom: '2px' }}>{q.b}</div>
+              <div style={{ fontSize: '28px', fontWeight: '900', color: '#1A6FFF' }}>{100 - q.pa}%</div>
+            </div>
+          </div>
+          <div style={{ height: '8px', background: '#F5F5F5', borderRadius: '999px', overflow: 'hidden', display: 'flex' }}>
+            <div style={{ width: `${q.pa}%`, background: '#FF3B3B', transition: 'width 1s cubic-bezier(.16,1,.3,1)' }}></div>
+            <div style={{ flex: 1, background: '#1A6FFF' }}></div>
+          </div>
+          <div style={{ fontSize: '11px', color: '#888', textAlign: 'center', marginTop: '6px' }}>총 {fmt(q.n)}명 참여</div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+          {/* 성별 */}
+          <div style={{ fontSize: '11px', fontWeight: '800', color: '#888', letterSpacing: '0.08em', marginBottom: '10px' }}>성별</div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+            {[{ label: '♂ 남성', pa: 52 }, { label: '♀ 여성', pa: 24 }].map(g => (
+              <div key={g.label} style={{ background: '#F5F5F5', borderRadius: '12px', padding: '14px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: '#0A0A0A', marginBottom: '10px' }}>{g.label}</div>
+                {[{ name: q.a, pct: g.pa, color: '#FF3B3B' }, { name: q.b, pct: 100 - g.pa, color: '#1A6FFF' }].map(item => (
+                  <div key={item.name} style={{ marginBottom: '6px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '3px' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '700', color: '#444' }}>{item.name}</span>
+                      <span style={{ fontSize: '12px', fontWeight: '900', color: item.color }}>{item.pct}%</span>
+                    </div>
+                    <div style={{ height: '4px', background: '#E8E8E8', borderRadius: '999px', overflow: 'hidden' }}>
+                      <div style={{ width: `${item.pct}%`, height: '100%', background: item.color, borderRadius: '999px' }}></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+
+          {/* 나이별 */}
+          <div style={{ fontSize: '11px', fontWeight: '800', color: '#888', letterSpacing: '0.08em', marginBottom: '10px' }}>나이별</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            {[
+              { age: '10대', pa: 28 }, { age: '20대', pa: 31 },
+              { age: '30대', pa: 42 }, { age: '40대', pa: 58 },
+              { age: '50대', pa: 61 }, { age: '60+', pa: 65 },
+            ].map(row => (
+              <div key={row.age} style={{ display: 'grid', gridTemplateColumns: '40px 1fr 1fr', gap: '6px', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', fontWeight: '700', color: '#888', textAlign: 'right', paddingRight: '4px' }}>{row.age}</span>
+                <div style={{ height: '22px', background: '#FFF0F0', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: '6px' }}>
+                  <div style={{ position: 'absolute', right: 0, width: `${row.pa}%`, height: '22px', background: 'rgba(255,59,59,0.15)', borderRadius: '4px' }}></div>
+                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#FF3B3B', position: 'relative' }}>{row.pa}%</span>
+                </div>
+                <div style={{ height: '22px', background: '#EEF4FF', borderRadius: '4px', overflow: 'hidden', display: 'flex', alignItems: 'center', paddingLeft: '6px' }}>
+                  <span style={{ fontSize: '10px', fontWeight: '800', color: '#1A6FFF' }}>{100 - row.pa}%</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+    </div>
+  )
+}
