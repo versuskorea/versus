@@ -125,17 +125,20 @@ export default function Feed() {
       if (sheetOpen) return
       const dy = touchStartY.current - e.touches[0].clientY
       const dx = Math.abs(touchStartX.current - e.touches[0].clientX)
-      if (Math.abs(dy) > 10 && dx < Math.abs(dy)) {
+      if (Math.abs(dy) > 15 && dx < Math.abs(dy) * 0.6) {
         e.preventDefault()
         isSwiping.current = true
         setSlideOffset(-dy)
+      } else if (dx > Math.abs(dy) * 0.6) {
+        // 수평이면 스와이프 취소
+        isSwiping.current = false
       }
     }
     const handleTouchEnd = (e: TouchEvent) => {
       if (sheetOpen || !isSwiping.current) return
       const dy = touchStartY.current - e.changedTouches[0].clientY
       const dx = Math.abs(touchStartX.current - e.changedTouches[0].clientX)
-      if (Math.abs(dy) > 60 && dx < 40) {
+      if (Math.abs(dy) > 80 && dx < 40) {
         setIsAnimating(true)
         if (dy > 0) {
           setSlideOffset(-window.innerHeight)
