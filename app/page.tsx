@@ -14,6 +14,7 @@ const R = '#FF3B3B'
 const RS = 'rgba(255,59,59,0.12)'
 const RB = 'rgba(255,59,59,0.3)'
 const font = '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif'
+const CARD_H = 270 // 카드 고정 높이
 
 type Vote = {
   id: string; question: string; option_a: string; option_b: string
@@ -55,6 +56,43 @@ async function loadVotes() {
   })
 }
 
+// 하트 폭죽 파티클
+function HeartBurst({ active }: { active: boolean }) {
+  if (!active) return null
+  const particles = [
+    { angle: -45, color: '#FF3B3B' },
+    { angle: 45, color: '#FF6B6B' },
+    { angle: -135, color: '#FF3B3B' },
+    { angle: 135, color: '#FF6B6B' },
+    { angle: 0, color: '#FFD700' },
+    { angle: 90, color: '#FF3B3B' },
+    { angle: -90, color: '#FFD700' },
+    { angle: 180, color: '#FF6B6B' },
+  ]
+  return (
+    <div style={{ position:'absolute', inset:0, pointerEvents:'none', display:'flex', alignItems:'center', justifyContent:'center' }}>
+      {particles.map((p, i) => (
+        <div key={i} style={{
+          position:'absolute',
+          width:'6px', height:'6px',
+          borderRadius:'50%',
+          background: p.color,
+          animation: `burst-${i} 0.5s ease-out forwards`,
+          transform: `rotate(${p.angle}deg)`,
+        }} />
+      ))}
+      <style>{`
+        ${particles.map((p, i) => `
+          @keyframes burst-${i} {
+            0% { transform: translate(0,0) scale(1); opacity: 1; }
+            100% { transform: translate(${Math.cos(p.angle * Math.PI/180) * 20}px, ${Math.sin(p.angle * Math.PI/180) * 20}px) scale(0); opacity: 0; }
+          }
+        `).join('')}
+      `}</style>
+    </div>
+  )
+}
+
 export default function Home() {
   const router = useRouter()
   const [votes, setVotes] = useState<Vote[]>([])
@@ -67,6 +105,8 @@ export default function Home() {
   const [allLatest, setAllLatest] = useState<Vote[]>([])
   const [voted, setVoted] = useState<Record<string, 'a'|'b'>>({})
   const [liked, setLiked] = useState<Record<string, boolean>>({})
+  const [likeCounts, setLikeCounts] = useState<Record<string, number>>({})
+  const [burstId, setBurstId] = useState<string|null>(null)
   const [commentVoteId, setCommentVoteId] = useState<string|null>(null)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
@@ -76,13 +116,13 @@ export default function Home() {
   const [refreshing, setRefreshing] = useState(false)
   const [now, setNow] = useState(Date.now())
 
-  // 카드 스와이프 애니메이션
-  const [cardAnim, setCardAnim] = useState(0)
-  const [cardAnimating, setCardAnimating] = useState(false)
-
-  const touchStartY = useRef(0)
+  // 카드 드래그 스와이프
+  const [cardOffset, setCardOffset] = useState(0)  // 실시간 드래그 offset
+  const [cardTransition, setCardTransition] = useState(false)  // 스르륵 전환 중
   const cardTouchStartX = useRef(0)
   const cardTouchStartY = useRef(0)
+  const cardIsDragging = useRef(false)
+  const touchStartY = useRef(0)
 
   useEffect(() => {
     loadVotes().then(data => {
@@ -94,6 +134,8 @@ export default function Home() {
       setVoted(ex)
       const lk = JSON.parse(localStorage.getItem('versus_liked')||'{}')
       setLiked(lk)
+      const lc = JSON.parse(localStorage.getItem('versus_likecount')||'{}')
+      setLikeCounts(lc)
     } catch {}
     const t = setInterval(() => setNow(Date.now()), 1000)
     const channel = supabase.channel('home-votes')
@@ -168,11 +210,21 @@ export default function Home() {
 
   function handleLike(voteId: string, e: React.MouseEvent) {
     e.stopPropagation()
+    const isNowLiked = !liked[voteId]
     setLiked(p => {
-      const next = { ...p, [voteId]: !p[voteId] }
+      const next = { ...p, [voteId]: isNowLiked }
       try { localStorage.setItem('versus_liked', JSON.stringify(next)) } catch {}
       return next
     })
+    setLikeCounts(p => {
+      const next = { ...p, [voteId]: (p[voteId] || 0) + (isNowLiked ? 1 : -1) }
+      try { localStorage.setItem('versus_likecount', JSON.stringify(next)) } catch {}
+      return next
+    })
+    if (isNowLiked) {
+      setBurstId(voteId)
+      setTimeout(() => setBurstId(null), 500)
+    }
   }
 
   async function openComments(voteId: string) {
@@ -190,31 +242,53 @@ export default function Home() {
     if (data) { setComments(prev => [data, ...prev]); setCommentText('') }
   }
 
-  // 카드 스와이프 핸들러
+  // ── 카드 드래그 스와이프 (손가락 따라 실시간 이동) ──
   function onCardTouchStart(e: React.TouchEvent) {
     cardTouchStartX.current = e.touches[0].clientX
     cardTouchStartY.current = e.touches[0].clientY
+    cardIsDragging.current = false
+    setCardTransition(false)
   }
+
+  function onCardTouchMove(e: React.TouchEvent) {
+    const dx = e.touches[0].clientX - cardTouchStartX.current
+    const dy = Math.abs(e.touches[0].clientY - cardTouchStartY.current)
+    // 수평이 확실할 때만
+    if (Math.abs(dx) > 8 && dy < Math.abs(dx) * 0.5) {
+      cardIsDragging.current = true
+      // 끝에 도달하면 저항감
+      const atStart = hotIdx === 0 && dx > 0
+      const atEnd = hotIdx === currentVotes.length - 1 && dx < 0
+      const resistance = (atStart || atEnd) ? 0.25 : 1
+      setCardOffset(dx * resistance)
+    }
+  }
+
   function onCardTouchEnd(e: React.TouchEvent) {
+    if (!cardIsDragging.current) return
     const dx = cardTouchStartX.current - e.changedTouches[0].clientX
     const dy = Math.abs(cardTouchStartY.current - e.changedTouches[0].clientY)
-    // 수평이 확실할 때만 (대각선 완전 차단)
-    if (Math.abs(dx) > 50 && dy < Math.abs(dx) * 0.4) {
+
+    if (Math.abs(dx) > 60 && dy < Math.abs(dx) * 0.5) {
       const dir = dx > 0 ? 1 : -1
       const next = hotIdx + dir
-      if (next < 0 || next >= currentVotes.length) return
-      // 나가는 방향으로 날리기
-      setCardAnimating(true)
-      setCardAnim(-dir * 320)
-      setTimeout(() => {
-        setHotIdx(next)
-        setCardAnim(dir * 320)  // 반대편에서 들어오기
-        setCardAnimating(false)
-        requestAnimationFrame(() => {
-          setTimeout(() => setCardAnim(0), 10)
-        })
-      }, 180)
+      if (next >= 0 && next < currentVotes.length) {
+        // 다음 카드로 스르륵
+        setCardTransition(true)
+        setCardOffset(-dir * 400)
+        setTimeout(() => {
+          setHotIdx(next)
+          setCardTransition(false)
+          setCardOffset(0)
+        }, 250)
+        return
+      }
     }
+    // 복귀
+    setCardTransition(true)
+    setCardOffset(0)
+    setTimeout(() => setCardTransition(false), 250)
+    cardIsDragging.current = false
   }
 
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
@@ -241,6 +315,9 @@ export default function Home() {
     <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
       style={{ maxWidth:'390px', margin:'0 auto', minHeight:'100vh', background:BG, fontFamily:font }}>
 
+      {/* TopBar */}
+      <TopBar />
+
       {/* Pull to refresh */}
       <div style={{ height: pulling||refreshing ? `${Math.min(pullY,60)}px` : '0px', transition: pulling?'none':'height 0.3s', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
         <div style={{ fontSize:'12px', color:'white', opacity:0.5, fontWeight:700 }}>
@@ -254,7 +331,7 @@ export default function Home() {
         {/* 탭 */}
         <div style={{ display:'flex', borderBottom:'0.5px solid rgba(255,255,255,0.06)', overflowX:'auto', scrollbarWidth:'none' }}>
           {['🔥 오늘의 이슈','👥 유저의 선택','🏆 레전드'].map(tab => (
-            <div key={tab} onClick={() => { setActiveTab(tab); setHotIdx(0) }} style={{
+            <div key={tab} onClick={() => { setActiveTab(tab); setHotIdx(0); setCardOffset(0) }} style={{
               padding:'10px 14px 9px', fontSize:'12px', whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
               fontWeight: activeTab===tab ? 900 : 600,
               color: activeTab===tab ? Y : 'white',
@@ -264,10 +341,11 @@ export default function Home() {
           ))}
         </div>
 
-        {/* 핫 카드 - 좌우 스와이프 + 고정 높이 */}
+        {/* 핫 카드 - 드래그 스와이프 */}
         <div
-          style={{ padding:'12px 14px 0', overflow:'hidden' }}
+          style={{ padding:'12px 14px 0', overflow:'hidden', touchAction:'pan-y' }}
           onTouchStart={onCardTouchStart}
+          onTouchMove={onCardTouchMove}
           onTouchEnd={onCardTouchEnd}
         >
           {hot ? (
@@ -277,62 +355,62 @@ export default function Home() {
               border:`1px solid ${YB}`,
               boxShadow:`0 0 30px rgba(255,215,0,0.08)`,
               position:'relative', overflow:'hidden',
-              minHeight: '220px', // 고정 높이 - 투표 전후 크기 통일
-              display:'flex', flexDirection:'column', justifyContent:'space-between',
-              // 슬라이드 애니메이션
-              transform: `translateX(${cardAnim}px)`,
-              transition: cardAnimating ? 'none' : 'transform 0.22s cubic-bezier(0.4,0,0.2,1)',
+              // 고정 높이 - 투표 전후 동일
+              height: `${CARD_H}px`,
+              display:'flex', flexDirection:'column',
+              // 실시간 드래그 + 스르륵
+              transform: `translateX(${cardOffset}px)`,
+              transition: cardTransition ? 'transform 0.25s cubic-bezier(0.4,0,0.2,1)' : 'none',
               willChange: 'transform',
             }}>
-              {/* 노란 글로우 원 */}
+              {/* 노란 글로우 */}
               <div style={{ position:'absolute', top:'-60px', left:'50%', transform:'translateX(-50%)', width:'200px', height:'200px', borderRadius:'50%', background:'radial-gradient(circle, rgba(255,215,0,0.06) 0%, transparent 70%)', pointerEvents:'none' }} />
 
-              <div>
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
-                  <span style={{ fontSize:'10px', color:'white', opacity:0.5, fontWeight:700 }}>{hot.category}</span>
-                  <span style={{ fontSize:'10px', color:'white', opacity:0.3 }}>{hotIdx+1}위</span>
-                </div>
-
-                {/* 질문 */}
-                <div onClick={() => router.push(`/vote/${hot.id}`)} style={{ fontSize:'17px', fontWeight:900, color:'white', lineHeight:1.3, marginBottom:'12px', letterSpacing:'-0.025em', cursor:'pointer' }}>
-                  {hot.question}
-                </div>
-
-                {/* A/B 버튼 */}
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
-                  {([
-                    { side:'a' as const, name:hot.option_a, emoji:hot.emoji_a, pct:hot.pa, ac:Y, bg:YS, bd:Y, sh:'rgba(255,215,0,0.25)', label:'A' },
-                    { side:'b' as const, name:hot.option_b, emoji:hot.emoji_b, pct:100-hot.pa, ac:R, bg:RS, bd:R, sh:'rgba(255,59,59,0.2)', label:'B' },
-                  ]).map(opt => (
-                    <div key={opt.side} onClick={() => handleVote(hot.id, opt.side)} style={{
-                      borderRadius:'12px', padding:'12px 8px', textAlign:'center',
-                      cursor: hotIsVoted ? 'default' : 'pointer',
-                      border:`2px solid ${hotIsVoted===opt.side ? opt.bd : hotIsVoted ? 'rgba(255,255,255,0.06)' : opt.side==='a' ? 'rgba(255,215,0,0.2)' : 'rgba(255,59,59,0.2)'}`,
-                      background: hotIsVoted===opt.side ? opt.bg : hotIsVoted ? 'rgba(255,255,255,0.03)' : opt.side==='a' ? 'rgba(255,215,0,0.05)' : 'rgba(255,59,59,0.05)',
-                      boxShadow: hotIsVoted===opt.side ? `0 0 20px ${opt.sh}` : 'none',
-                      opacity: hotIsVoted && hotIsVoted!==opt.side ? 0.35 : 1,
-                      transition:'all 0.2s',
-                      minHeight:'90px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
-                    }}>
-                      <div style={{ fontSize:'20px', marginBottom:'6px' }}>{opt.emoji}</div>
-                      <div style={{ fontSize:'9px', fontWeight:900, color: opt.side==='a' ? Y : R, opacity:0.8, marginBottom:'4px', letterSpacing:'0.06em' }}>{opt.label}</div>
-                      <div style={{ fontSize:'13px', fontWeight:800, color:'white', marginBottom: hotIsVoted ? '8px' : 0 }}>{opt.name}</div>
-                      {hotIsVoted && <div style={{ fontSize:'20px', fontWeight:900, color:opt.ac }}>{opt.pct}%</div>}
-                    </div>
-                  ))}
-                </div>
+              {/* 상단 */}
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
+                <span style={{ fontSize:'10px', color:'white', opacity:0.5, fontWeight:700 }}>{hot.category}</span>
+                <span style={{ fontSize:'10px', color:'white', opacity:0.3 }}>{hotIdx+1}위</span>
               </div>
 
-              <div>
-                {/* 진행바 */}
+              {/* 질문 */}
+              <div onClick={() => router.push(`/vote/${hot.id}`)} style={{ fontSize:'16px', fontWeight:900, color:'white', lineHeight:1.3, marginBottom:'10px', letterSpacing:'-0.025em', cursor:'pointer', flex:'0 0 auto' }}>
+                {hot.question}
+              </div>
+
+              {/* A/B 버튼 - flex:1로 남은 공간 채움 */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'8px', flex:1 }}>
+                {([
+                  { side:'a' as const, name:hot.option_a, emoji:hot.emoji_a, pct:hot.pa, ac:Y, bg:YS, bd:Y, sh:'rgba(255,215,0,0.25)', label:'A' },
+                  { side:'b' as const, name:hot.option_b, emoji:hot.emoji_b, pct:100-hot.pa, ac:R, bg:RS, bd:R, sh:'rgba(255,59,59,0.2)', label:'B' },
+                ]).map(opt => (
+                  <div key={opt.side} onClick={() => handleVote(hot.id, opt.side)} style={{
+                    borderRadius:'12px', padding:'10px 8px', textAlign:'center',
+                    cursor: hotIsVoted ? 'default' : 'pointer',
+                    border:`2px solid ${hotIsVoted===opt.side ? opt.bd : hotIsVoted ? 'rgba(255,255,255,0.06)' : opt.side==='a' ? 'rgba(255,215,0,0.2)' : 'rgba(255,59,59,0.2)'}`,
+                    background: hotIsVoted===opt.side ? opt.bg : hotIsVoted ? 'rgba(255,255,255,0.03)' : opt.side==='a' ? 'rgba(255,215,0,0.05)' : 'rgba(255,59,59,0.05)',
+                    boxShadow: hotIsVoted===opt.side ? `0 0 20px ${opt.sh}` : 'none',
+                    opacity: hotIsVoted && hotIsVoted!==opt.side ? 0.35 : 1,
+                    transition:'all 0.2s',
+                    display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                  }}>
+                    <div style={{ fontSize:'20px', marginBottom:'4px' }}>{opt.emoji}</div>
+                    <div style={{ fontSize:'9px', fontWeight:900, color: opt.side==='a' ? Y : R, opacity:0.8, marginBottom:'3px', letterSpacing:'0.06em' }}>{opt.label}</div>
+                    <div style={{ fontSize:'13px', fontWeight:800, color:'white', marginBottom: hotIsVoted ? '6px' : 0 }}>{opt.name}</div>
+                    {hotIsVoted && <div style={{ fontSize:'18px', fontWeight:900, color:opt.ac }}>{opt.pct}%</div>}
+                  </div>
+                ))}
+              </div>
+
+              {/* 하단 */}
+              <div style={{ marginTop:'8px', flexShrink:0 }}>
                 {hotIsVoted && (
-                  <div style={{ height:'4px', background:'rgba(255,255,255,0.08)', borderRadius:'999px', overflow:'hidden', display:'flex', marginBottom:'10px' }}>
+                  <div style={{ height:'3px', background:'rgba(255,255,255,0.08)', borderRadius:'999px', overflow:'hidden', display:'flex', marginBottom:'6px' }}>
                     <div style={{ width:`${hot.pa}%`, background:Y, transition:'width 0.8s' }} />
                     <div style={{ flex:1, background:R }} />
                   </div>
                 )}
                 <div style={{ fontSize:'9px', color:'white', opacity:0.35, display:'flex', justifyContent:'space-between' }}>
-                  <span>{fmt(hot.total)}명 참여 · {hotIsVoted ? '투표 완료' : '← 스와이프 →'}</span>
+                  <span>{fmt(hot.total)}명 참여 · {hotIsVoted ? '투표 완료 ✓' : '← 밀어서 다음 →'}</span>
                   <span>{hotIdx+1} / {currentVotes.length}</span>
                 </div>
               </div>
@@ -350,7 +428,7 @@ export default function Home() {
         {/* 인디케이터 */}
         <div style={{ display:'flex', justifyContent:'center', gap:'4px', padding:'10px 0 12px' }}>
           {currentVotes.map((_,i) => (
-            <div key={i} onClick={() => setHotIdx(i)} style={{
+            <div key={i} onClick={() => { setHotIdx(i); setCardOffset(0) }} style={{
               width: i===hotIdx ? '16px' : '5px', height:'5px', borderRadius:'999px', cursor:'pointer',
               background: i===hotIdx ? Y : 'rgba(255,255,255,0.15)', transition:'all 0.25s',
             }} />
@@ -488,20 +566,32 @@ export default function Home() {
               <span style={{ fontSize:'10px', fontWeight:900, color:'white', opacity:0.2 }}>vs</span>
               <span style={{ fontSize:'11px', fontWeight:700, padding:'4px 12px', borderRadius:'999px', background:RS, color:R, border:`1px solid ${RB}` }}>{v.option_b}</span>
             </div>
-            {/* 하단 - 참여인원 + 좋아요 */}
+
+            {/* 하단 - 참여인원 + 하트 */}
             <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
               <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
                 <span style={{ fontSize:'10px', color:'white', opacity:0.35 }}>👥 {fmt(v.total)}명</span>
                 {v.total>100 && <span style={{ fontSize:'8px', fontWeight:800, padding:'2px 7px', borderRadius:'999px', background:YS, color:Y }}>인기</span>}
               </div>
-              {/* 하트 버튼 */}
-              <div onClick={e => handleLike(v.id, e)} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', padding:'4px 6px', borderRadius:'999px', background: liked[v.id] ? 'rgba(255,59,59,0.12)' : 'transparent', transition:'all 0.2s' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill={liked[v.id] ? '#FF3B3B' : 'none'} stroke={liked[v.id] ? '#FF3B3B' : 'rgba(255,255,255,0.3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+
+              {/* 하트 버튼 - 빈하트, 누르면 폭죽+카운트 */}
+              <div onClick={e => handleLike(v.id, e)}
+                style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', padding:'4px 8px', borderRadius:'999px', background: liked[v.id] ? 'rgba(255,59,59,0.1)' : 'transparent', transition:'all 0.2s', position:'relative' }}>
+                <HeartBurst active={burstId === v.id} />
+                <svg
+                  width="15" height="15" viewBox="0 0 24 24"
+                  fill={liked[v.id] ? '#FF3B3B' : 'none'}
+                  stroke={liked[v.id] ? '#FF3B3B' : 'rgba(255,255,255,0.3)'}
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  style={{ transition:'all 0.2s', transform: liked[v.id] ? 'scale(1.2)' : 'scale(1)' }}
+                >
                   <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                 </svg>
-                <span style={{ fontSize:'10px', fontWeight:700, color: liked[v.id] ? '#FF3B3B' : 'rgba(255,255,255,0.3)' }}>
-                  {liked[v.id] ? '좋아요' : '♡'}
-                </span>
+                {(likeCounts[v.id] || 0) > 0 && (
+                  <span style={{ fontSize:'10px', fontWeight:800, color: liked[v.id] ? '#FF3B3B' : 'rgba(255,255,255,0.3)' }}>
+                    {likeCounts[v.id]}
+                  </span>
+                )}
               </div>
             </div>
           </div>
