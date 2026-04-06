@@ -52,6 +52,8 @@ const StatsIcon = () => (
   </svg>
 )
 
+const SHEET_H = 44 // vh - 댓글창 높이 (질문 안 가리게)
+
 export default function Feed() {
   const router = useRouter()
   const [votes, setVotes] = useState<Vote[]>([])
@@ -70,7 +72,9 @@ export default function Feed() {
   const commentInputRef = useRef<HTMLInputElement>(null)
 
   const [showComments, setShowComments] = useState(false)
+  const [commentsMounted, setCommentsMounted] = useState(false) // 슬라이드업 트리거용
   const [showStats, setShowStats] = useState(false)
+  const [statsMounted, setStatsMounted] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
   const [commentText, setCommentText] = useState('')
   const [commentsLoading, setCommentsLoading] = useState(false)
@@ -78,13 +82,10 @@ export default function Feed() {
 
   const [slideOffset, setSlideOffset] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
-
-  // 키보드 높이 감지
   const [keyboardHeight, setKeyboardHeight] = useState(0)
 
   useEffect(() => { fetchVotes() }, [])
 
-  // 키보드 올라올 때 감지 (visualViewport API)
   useEffect(() => {
     const vv = window.visualViewport
     if (!vv) return
@@ -99,15 +100,16 @@ export default function Feed() {
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
+    const sheetOpen = showComments || showStats
     const handleTouchStart = (e: TouchEvent) => {
-      if (showComments || showStats) return
+      if (sheetOpen) return
       touchStartY.current = e.touches[0].clientY
       touchStartX.current = e.touches[0].clientX
       isSwiping.current = false
       setSlideOffset(0)
     }
     const handleTouchMove = (e: TouchEvent) => {
-      if (showComments || showStats) return
+      if (sheetOpen) return
       const dy = touchStartY.current - e.touches[0].clientY
       const dx = Math.abs(touchStartX.current - e.touches[0].clientX)
       if (Math.abs(dy) > 10 && dx < Math.abs(dy)) {
@@ -117,7 +119,7 @@ export default function Feed() {
       }
     }
     const handleTouchEnd = (e: TouchEvent) => {
-      if (showComments || showStats || !isSwiping.current) return
+      if (sheetOpen || !isSwiping.current) return
       const dy = touchStartY.current - e.changedTouches[0].clientY
       const dx = Math.abs(touchStartX.current - e.changedTouches[0].clientX)
       if (Math.abs(dy) > 60 && dx < 40) {
@@ -195,23 +197,29 @@ export default function Feed() {
     const isNowLiked = !liked[v.id]
     setLiked(p => ({ ...p, [v.id]: isNowLiked }))
     setLikeCounts(p => ({ ...p, [v.id]: (p[v.id] || 0) + (isNowLiked ? 1 : -1) }))
-    if (isNowLiked) {
-      setBurstId(v.id)
-      setTimeout(() => setBurstId(null), 500)
-    }
+    if (isNowLiked) { setBurstId(v.id); setTimeout(() => setBurstId(null), 500) }
   }
 
   function openComments() {
-    setShowStats(false)
+    setShowStats(false); setStatsMounted(false)
     setShowComments(true)
     if (v) fetchComments(v.id)
-    // 약간 딜레이 후 포커스 (시트 애니메이션 후)
-    setTimeout(() => commentInputRef.current?.focus(), 400)
+    // 마운트 후 한 프레임 뒤에 mounted=true → 슬라이드업 트리거
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      setCommentsMounted(true)
+      setTimeout(() => commentInputRef.current?.focus(), 350)
+    }))
   }
-  function openStats() { setShowComments(false); setShowStats(true) }
+
+  function openStats() {
+    setShowComments(false); setCommentsMounted(false)
+    setShowStats(true)
+    requestAnimationFrame(() => requestAnimationFrame(() => setStatsMounted(true)))
+  }
+
   function closeSheets() {
-    setShowComments(false)
-    setShowStats(false)
+    setCommentsMounted(false); setStatsMounted(false)
+    setTimeout(() => { setShowComments(false); setShowStats(false) }, 300)
     setKeyboardHeight(0)
     commentInputRef.current?.blur()
   }
@@ -228,6 +236,7 @@ export default function Feed() {
   const isLiked = v ? liked[v.id] : false
   const likeCount = v ? (likeCounts[v.id] || 0) : 0
   const sheetOpen = showComments || showStats
+  const sheetH = `${SHEET_H}vh`
 
   if (loading) return (
     <div style={{ maxWidth: '390px', margin: '0 auto', height: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0A' }}>
@@ -248,26 +257,24 @@ export default function Feed() {
     <>
       <style>{`
         @keyframes gradMove {
-          0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%}
+          0%   { background-position: 0% 50% }
+          25%  { background-position: 100% 0% }
+          50%  { background-position: 100% 100% }
+          75%  { background-position: 0% 100% }
+          100% { background-position: 0% 50% }
         }
         .animated-bg {
-          background: linear-gradient(135deg, #0A0A0A, #1a0a2e, #0a1a2e, #1a1a0a, #2e0a1a, #0A0A0A);
-          background-size: 400% 400%;
-          animation: gradMove 8s ease infinite;
+          background: linear-gradient(135deg, #0d0d1a, #2a0a3e, #0a2a1a, #3e1a00, #001a3e, #1a001a);
+          background-size: 600% 600%;
+          animation: gradMove 3s ease infinite;
         }
-        .comment-sheet {
-          position: fixed;
-          left: 50%;
-          transform: translateX(-50%);
-          width: 100%;
-          max-width: 390px;
-          z-index: 100;
-          display: flex;
-          flex-direction: column;
-          background: rgba(10,8,20,0.98);
-          border-radius: 20px 20px 0 0;
-          border: 0.5px solid rgba(255,255,255,0.08);
-          backdrop-filter: blur(20px);
+        /* 시트 슬라이드업 */
+        .sheet-enter {
+          transform: translateY(100%);
+          transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+        }
+        .sheet-enter-active {
+          transform: translateY(0%);
         }
       `}</style>
 
@@ -334,10 +341,10 @@ export default function Feed() {
           </>
         )}
 
-        {/* 투표 영역 - 댓글 열리면 위로 올라감 */}
+        {/* 투표 영역 */}
         <div style={{
-          height: sheetOpen ? '42vh' : '100svh',
-          transition: 'height 0.35s cubic-bezier(0.4,0,0.2,1)',
+          height: sheetOpen ? `${100 - SHEET_H}svh` : '100svh',
+          transition: 'height 0.32s cubic-bezier(0.32,0.72,0,1)',
           position: 'relative', overflow: 'hidden',
         }}>
           <div style={{
@@ -388,11 +395,9 @@ export default function Feed() {
 
             {/* 오른쪽 액션 버튼 */}
             <div style={{ position: 'absolute', right: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-              {/* 좋아요 */}
               <div onClick={handleLike} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', position: 'relative' }}>
                 <HeartBurst active={burstId === v.id} />
-                <svg width="28" height="28" viewBox="0 0 24 24"
-                  fill={isLiked ? Y : 'none'} stroke={Y} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill={isLiked ? Y : 'none'} stroke={Y} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                 </svg>
                 <span style={{ fontSize: '10px', fontWeight: 700, color: isLiked ? Y : 'rgba(255,255,255,0.6)', minWidth: '30px', textAlign: 'center' }}>
@@ -400,10 +405,8 @@ export default function Feed() {
                 </span>
               </div>
 
-              {/* 댓글 */}
               <div onClick={openComments} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
-                  stroke={showComments ? Y : 'white'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={showComments ? Y : 'white'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                 </svg>
                 <span style={{ fontSize: '10px', fontWeight: 700, color: showComments ? Y : 'rgba(255,255,255,0.6)' }}>
@@ -411,13 +414,11 @@ export default function Feed() {
                 </span>
               </div>
 
-              {/* 공유 */}
               <div onClick={handleShare} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
                 <ShareIcon />
                 <span style={{ fontSize: '10px', fontWeight: 600, color: sharedId === v.id ? Y : 'rgba(255,255,255,0.6)' }}>{sharedId === v.id ? '복사됨' : '공유'}</span>
               </div>
 
-              {/* 통계 */}
               <div onClick={openStats} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
                 <StatsIcon />
                 <span style={{ fontSize: '10px', fontWeight: 600, color: showStats ? Y : 'rgba(255,255,255,0.6)' }}>통계</span>
@@ -425,7 +426,6 @@ export default function Feed() {
             </div>
           </div>
 
-          {/* 스와이프 힌트 */}
           {!sheetOpen && votes.length > 1 && (
             <div style={{ position: 'absolute', bottom: '28px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', opacity: 0.35, pointerEvents: 'none' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><polyline points="18 15 12 9 6 15" /></svg>
@@ -434,7 +434,6 @@ export default function Feed() {
             </div>
           )}
 
-          {/* 세로 인디케이터 */}
           {!sheetOpen && (
             <div style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {votes.map((_, i) => (
@@ -447,35 +446,42 @@ export default function Feed() {
           )}
         </div>
 
-        {/* BottomNav */}
         <div style={{ height: '60px', background: 'rgba(6,6,20,0.98)' }}>
           <BottomNav />
         </div>
       </div>
 
-      {/* 댓글 시트 - position fixed로 키보드 위에 뜨게 */}
+      {/* 댓글 시트 - 스르륵 올라오기 */}
       {showComments && (
         <div
-          className="comment-sheet"
+          className="sheet-enter"
           style={{
+            position: 'fixed',
+            left: '50%',
+            transform: commentsMounted ? 'translateX(-50%) translateY(0%)' : 'translateX(-50%) translateY(100%)',
+            transition: 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
+            width: '100%', maxWidth: '390px',
             bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0px',
-            height: keyboardHeight > 0 ? '50vh' : 'calc(58vh - 60px)',
-            transition: 'bottom 0.25s ease, height 0.25s ease',
+            height: keyboardHeight > 0 ? '48vh' : sheetH,
+            zIndex: 100,
+            display: 'flex', flexDirection: 'column',
+            background: 'rgba(10,8,20,0.98)',
+            borderRadius: '20px 20px 0 0',
+            border: '0.5px solid rgba(255,255,255,0.1)',
+            backdropFilter: 'blur(20px)',
           }}
         >
-          {/* 헤더 */}
           <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
             <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>💬 댓글 {v.comments_count}개</span>
             <div onClick={closeSheets} style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>✕</div>
           </div>
 
-          {/* 댓글 목록 */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
             {commentsLoading ? (
               <div style={{ textAlign: 'center', padding: '20px', fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>불러오는 중...</div>
             ) : comments.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '30px', fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>
-                {isVoted ? '첫 댓글을 달아보세요!' : '투표 후 댓글 달 수 있어요'}
+              <div style={{ textAlign: 'center', padding: '24px', fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>
+                {isVoted ? '첫 댓글을 달아보세요! 👋' : '투표 후 댓글 달 수 있어요'}
               </div>
             ) : comments.map(c => (
               <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'flex-end' }}>
@@ -494,7 +500,6 @@ export default function Feed() {
                     color: c.choice === 'a' ? '#B8860B' : '#4A8FFF',
                     marginBottom: '4px', display: 'inline-block',
                   }}>{c.choice === 'a' ? v.option_a : v.option_b}파</span>
-                  {/* 인스타 스타일 말풍선 */}
                   <div style={{
                     background: 'rgba(255,255,255,0.08)',
                     borderRadius: '18px 18px 18px 4px',
@@ -509,7 +514,6 @@ export default function Feed() {
             ))}
           </div>
 
-          {/* 입력창 - 항상 보이게 */}
           <div style={{ padding: '8px 12px 16px', borderTop: '0.5px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, background: 'rgba(10,8,20,0.98)' }}>
             <input
               ref={commentInputRef}
@@ -542,27 +546,30 @@ export default function Feed() {
         </div>
       )}
 
-      {/* 통계 시트 - position fixed */}
+      {/* 통계 시트 - 스르륵 올라오기 */}
       {showStats && (
         <div style={{
-          position: 'fixed', left: '50%', transform: 'translateX(-50%)',
-          width: '100%', maxWidth: '390px', bottom: 0, zIndex: 100,
-          height: 'calc(58vh - 60px)',
+          position: 'fixed', left: '50%',
+          transform: statsMounted ? 'translateX(-50%) translateY(0%)' : 'translateX(-50%) translateY(100%)',
+          transition: 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
+          width: '100%', maxWidth: '390px',
+          bottom: 0, height: sheetH, zIndex: 100,
           background: 'rgba(10,8,20,0.98)', borderRadius: '20px 20px 0 0',
           overflow: 'hidden', backdropFilter: 'blur(20px)',
-          border: '0.5px solid rgba(255,255,255,0.08)',
+          border: '0.5px solid rgba(255,255,255,0.1)',
+          display: 'flex', flexDirection: 'column',
         }}>
           <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
             <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>📊 통계</span>
             <div onClick={closeSheets} style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>✕</div>
           </div>
-          <div style={{ padding: '20px 16px' }}>
-            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-              <div style={{ fontSize: '32px', fontWeight: 900, color: 'white', marginBottom: '4px' }}>{fmt(v.total)}명</div>
-              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>총 참여자</div>
+          <div style={{ padding: '16px', overflowY: 'auto' }}>
+            <div style={{ textAlign: 'center', marginBottom: '16px' }}>
+              <div style={{ fontSize: '28px', fontWeight: 900, color: 'white', marginBottom: '2px' }}>{fmt(v.total)}명</div>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>총 참여자</div>
             </div>
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
                 <span style={{ fontSize: '12px', fontWeight: 800, color: Y }}>{v.option_a} {v.pa}%</span>
                 <span style={{ fontSize: '12px', fontWeight: 800, color: '#4A8FFF' }}>{100 - v.pa}% {v.option_b}</span>
               </div>
@@ -572,16 +579,16 @@ export default function Feed() {
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div style={{ background: YS, border: `1px solid ${YB}`, borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-                <div style={{ fontSize: '24px', marginBottom: '6px' }}>{v.emoji_a}</div>
-                <div style={{ fontSize: '12px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{v.option_a}</div>
-                <div style={{ fontSize: '24px', fontWeight: 900, color: Y }}>{v.pa}%</div>
+              <div style={{ background: YS, border: `1px solid ${YB}`, borderRadius: '14px', padding: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '22px', marginBottom: '4px' }}>{v.emoji_a}</div>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{v.option_a}</div>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: Y }}>{v.pa}%</div>
                 <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{fmt(v.count_a)}명</div>
               </div>
-              <div style={{ background: 'rgba(26,111,255,0.12)', border: '1px solid rgba(26,111,255,0.3)', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-                <div style={{ fontSize: '24px', marginBottom: '6px' }}>{v.emoji_b}</div>
-                <div style={{ fontSize: '12px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{v.option_b}</div>
-                <div style={{ fontSize: '24px', fontWeight: 900, color: '#4A8FFF' }}>{100 - v.pa}%</div>
+              <div style={{ background: 'rgba(26,111,255,0.12)', border: '1px solid rgba(26,111,255,0.3)', borderRadius: '14px', padding: '12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '22px', marginBottom: '4px' }}>{v.emoji_b}</div>
+                <div style={{ fontSize: '11px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{v.option_b}</div>
+                <div style={{ fontSize: '22px', fontWeight: 900, color: '#4A8FFF' }}>{100 - v.pa}%</div>
                 <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{fmt(v.count_b)}명</div>
               </div>
             </div>
