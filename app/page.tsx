@@ -46,7 +46,6 @@ function timeAgo(d: string) {
 const ADS = [
   { emoji:'🎯', brand:'VERSUS PRO', title:'광고 없이 즐기세요', desc:'월 2,900원으로 광고 없이 무제한', color:Y, bg:YS, border:YB, btn:'시작하기 →' },
   { emoji:'📱', brand:'앱 출시 예정', title:'VERSUS 앱이 곧 나와요', desc:'더 빠르고 편리한 투표 경험', color:'#7C6FFF', bg:'rgba(124,111,255,0.08)', border:'rgba(124,111,255,0.25)', btn:'알림 받기 →' },
-  { emoji:'🔥', brand:'이슈 알림', title:'핫한 투표 놓치지 마세요', desc:'관심 카테고리 새 투표 알림 설정', color:R, bg:RS, border:RB, btn:'설정하기 →' },
 ]
 
 async function loadVotes() {
@@ -67,8 +66,8 @@ export default function Home() {
   const [hotIdx, setHotIdx] = useState(0)
   const [activeTab, setActiveTab] = useState('🔥 오늘의 이슈')
   const [loading, setLoading] = useState(true)
-  const [latestPage, setLatestPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
+  const [latestPage, setLatestPage] = useState(1)
   const [latestLoading, setLatestLoading] = useState(false)
   const [allLatest, setAllLatest] = useState<Vote[]>([])
   const [voted, setVoted] = useState<Record<string,'a'|'b'>>({})
@@ -207,6 +206,7 @@ export default function Home() {
     <div onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
       style={{ maxWidth:'390px', margin:'0 auto', minHeight:'100vh', background:BG, fontFamily:font }}>
 
+      {/* Pull to refresh */}
       <div style={{ height: pulling||refreshing ? `${Math.min(pullY,60)}px` : '0px', transition: pulling?'none':'height 0.3s', overflow:'hidden', display:'flex', alignItems:'center', justifyContent:'center' }}>
         <div style={{ fontSize:'12px', color:'white', opacity:0.5, fontWeight:700 }}>
           {refreshing ? '새로고침 중...' : pullY>50 ? '놓으면 새로고침' : '당겨서 새로고침'}
@@ -215,96 +215,113 @@ export default function Home() {
 
       <TopBar />
 
-      {/* 위젯 */}
-      <div style={{ borderBottom:'0.5px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ display:'flex', borderBottom:'0.5px solid rgba(255,255,255,0.06)', overflowX:'auto', scrollbarWidth:'none' }}>
-          {['🔥 오늘의 이슈','👥 유저의 선택','🏆 레전드'].map(tab => (
-            <div key={tab} onClick={() => { setActiveTab(tab); setHotIdx(0) }} style={{
-              padding:'10px 14px 9px', fontSize:'12px', whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
-              fontWeight: activeTab===tab ? 900 : 600,
-              color: activeTab===tab ? Y : 'white',
-              opacity: activeTab===tab ? 1 : 0.35,
-              borderBottom: activeTab===tab ? `2.5px solid ${Y}` : '2.5px solid transparent',
-            }}>{tab}</div>
-          ))}
-        </div>
+      {/* 탭 */}
+      <div style={{ display:'flex', borderBottom:'0.5px solid rgba(255,255,255,0.06)', overflowX:'auto', scrollbarWidth:'none' }}>
+        {['🔥 오늘의 이슈','👥 유저의 선택','🏆 레전드'].map(tab => (
+          <div key={tab} onClick={() => { setActiveTab(tab); setHotIdx(0) }} style={{
+            padding:'10px 14px 9px', fontSize:'12px', whiteSpace:'nowrap', cursor:'pointer', flexShrink:0,
+            fontWeight: activeTab===tab ? 900 : 600,
+            color: activeTab===tab ? Y : 'white',
+            opacity: activeTab===tab ? 1 : 0.35,
+            borderBottom: activeTab===tab ? `2.5px solid ${Y}` : '2.5px solid transparent',
+          }}>{tab}</div>
+        ))}
+      </div>
 
-        <div style={{ padding:'12px 14px 0' }}>
-          {hot ? (
-            <div style={{ background:'linear-gradient(135deg, #1a1400 0%, #141414 50%, #0f0a00 100%)', borderRadius:'14px', padding:'14px', border:`1px solid ${YB}`, boxShadow:'0 0 30px rgba(255,215,0,0.08)', position:'relative', overflow:'hidden' }}>
-              <div style={{ position:'absolute', top:'-60px', left:'50%', transform:'translateX(-50%)', width:'200px', height:'200px', borderRadius:'50%', background:'radial-gradient(circle, rgba(255,215,0,0.06) 0%, transparent 70%)', pointerEvents:'none' }} />
+      {/* 핫이슈 카드 */}
+      <div style={{ padding:'12px 12px 0' }}>
+        {hot ? (
+          <div style={{
+            background:'linear-gradient(135deg, #1a1400 0%, #141414 50%, #0f0a00 100%)',
+            borderRadius:'20px', border:`1px solid ${YB}`,
+            boxShadow:`0 0 40px rgba(255,215,0,0.1), 0 8px 32px rgba(0,0,0,0.5)`,
+            position:'relative', overflow:'hidden',
+          }}>
+            <div style={{ position:'absolute', top:'-80px', left:'50%', transform:'translateX(-50%)', width:'260px', height:'260px', borderRadius:'50%', background:'radial-gradient(circle, rgba(255,215,0,0.08) 0%, transparent 70%)', pointerEvents:'none' }} />
+            <div style={{ padding:'16px', position:'relative', zIndex:1 }}>
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'10px' }}>
                 <span style={{ fontSize:'10px', color:'white', opacity:0.5, fontWeight:700 }}>{hot.category}</span>
-                <span style={{ fontSize:'10px', color:'white', opacity:0.3 }}>{hotIdx+1}위</span>
+                <div style={{ display:'flex', alignItems:'center', gap:'4px', background:'rgba(255,59,59,0.15)', border:'1px solid rgba(255,59,59,0.35)', borderRadius:'999px', padding:'3px 8px' }}>
+                  <div style={{ width:'5px', height:'5px', borderRadius:'50%', background:R }} />
+                  <span style={{ fontSize:'8px', fontWeight:900, color:R }}>HOT</span>
+                </div>
               </div>
-              <div onClick={() => router.push(`/vote/${hot.id}`)} style={{ fontSize:'17px', fontWeight:900, color:'white', lineHeight:1.3, marginBottom:'12px', letterSpacing:'-0.025em', cursor:'pointer' }}>
+
+              <div onClick={() => router.push(`/vote/${hot.id}`)} style={{ fontSize:'20px', fontWeight:900, color:'white', lineHeight:1.3, marginBottom:'16px', letterSpacing:'-0.03em', cursor:'pointer' }}>
                 {hot.question}
               </div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'12px' }}>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'10px', marginBottom:'14px' }}>
                 {([
                   { side:'a' as const, name:hot.option_a, emoji:hot.emoji_a, pct:hot.pa, ac:Y, bg:YS, bd:Y },
                   { side:'b' as const, name:hot.option_b, emoji:hot.emoji_b, pct:100-hot.pa, ac:R, bg:RS, bd:R },
                 ]).map(opt => (
                   <div key={opt.side} onClick={() => handleVote(hot.id, opt.side)} style={{
-                    borderRadius:'12px', padding:'12px 8px', textAlign:'center',
+                    borderRadius:'16px', padding:'16px 12px', textAlign:'center',
                     cursor: hotIsVoted ? 'default' : 'pointer',
                     border:`2px solid ${hotIsVoted===opt.side ? opt.bd : hotIsVoted ? 'rgba(255,255,255,0.06)' : opt.side==='a' ? 'rgba(255,215,0,0.2)' : 'rgba(255,59,59,0.2)'}`,
-                    background: hotIsVoted===opt.side ? opt.bg : hotIsVoted ? 'rgba(255,255,255,0.03)' : opt.side==='a' ? 'rgba(255,215,0,0.05)' : 'rgba(255,59,59,0.05)',
-                    boxShadow: hotIsVoted===opt.side ? (opt.side==='a' ? '0 0 20px rgba(255,215,0,0.2)' : '0 0 20px rgba(255,59,59,0.2)') : 'none',
+                    background: hotIsVoted===opt.side ? opt.bg : hotIsVoted ? 'rgba(255,255,255,0.03)' : opt.side==='a' ? 'rgba(255,215,0,0.07)' : 'rgba(255,59,59,0.07)',
+                    boxShadow: hotIsVoted===opt.side ? `0 0 20px ${opt.side==='a' ? 'rgba(255,215,0,0.2)' : 'rgba(255,59,59,0.2)'}` : 'none',
                     opacity: hotIsVoted && hotIsVoted!==opt.side ? 0.35 : 1,
                     transition:'all 0.2s',
                   }}>
-                    <div style={{ fontSize:'20px', marginBottom:'6px' }}>{opt.emoji}</div>
-                    <div style={{ fontSize:'9px', fontWeight:900, color:opt.ac, opacity:0.8, marginBottom:'4px' }}>{opt.side.toUpperCase()}</div>
-                    <div style={{ fontSize:'13px', fontWeight:800, color:'white', marginBottom: hotIsVoted ? '8px' : 0 }}>{opt.name}</div>
-                    {hotIsVoted && <div style={{ fontSize:'20px', fontWeight:900, color:opt.ac }}>{opt.pct}%</div>}
+                    <div style={{ fontSize:'32px', marginBottom:'8px' }}>{opt.emoji}</div>
+                    <div style={{ fontSize:'9px', fontWeight:900, color:opt.ac, opacity:0.8, marginBottom:'4px', letterSpacing:'0.06em' }}>{opt.side.toUpperCase()}</div>
+                    <div style={{ fontSize:'14px', fontWeight:800, color:'white', marginBottom: hotIsVoted ? '8px' : '6px' }}>{opt.name}</div>
+                    {hotIsVoted
+                      ? <div style={{ fontSize:'26px', fontWeight:900, color:opt.ac }}>{opt.pct}%</div>
+                      : <div style={{ fontSize:'10px', color:opt.ac, opacity:0.6, fontWeight:700 }}>탭해서 투표</div>
+                    }
                   </div>
                 ))}
               </div>
+
               {hotIsVoted && (
                 <div style={{ height:'4px', background:'rgba(255,255,255,0.08)', borderRadius:'999px', overflow:'hidden', display:'flex', marginBottom:'10px' }}>
                   <div style={{ width:`${hot.pa}%`, background:Y, transition:'width 0.8s' }} />
                   <div style={{ flex:1, background:R }} />
                 </div>
               )}
-              <div style={{ fontSize:'9px', color:'white', opacity:0.35, display:'flex', justifyContent:'space-between' }}>
-                <span>{fmt(hot.total)}명 참여 · {hotIsVoted ? '투표 완료' : '탭해서 바로 투표'}</span>
-                <span>{hotIdx+1} / {currentVotes.length}</span>
-              </div>
-            </div>
-          ) : (
-            <div style={{ background:CARD, borderRadius:'14px', padding:'40px 14px', textAlign:'center', border:`1px solid ${YB}` }}>
-              <div style={{ fontSize:'13px', color:'white', opacity:0.4 }}>
-                {activeTab==='🔥 오늘의 이슈' ? '운영자가 등록한 이슈가 없어요' : '아직 투표가 없어요'}
-              </div>
-            </div>
-          )}
-        </div>
 
-        <div style={{ display:'flex', justifyContent:'center', gap:'4px', padding:'10px 0 12px' }}>
-          {currentVotes.map((_,i) => (
-            <div key={i} onClick={() => setHotIdx(i)} style={{
-              width: i===hotIdx ? '16px' : '5px', height:'5px', borderRadius:'999px', cursor:'pointer',
-              background: i===hotIdx ? Y : 'rgba(255,255,255,0.15)', transition:'all 0.25s',
-            }} />
-          ))}
-        </div>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <span style={{ fontSize:'10px', color:'white', opacity:0.4 }}>👥 {fmt(hot.total)}명 참여</span>
+                <span style={{ fontSize:'10px', color:'white', opacity:0.3 }}>{hotIdx+1} / {currentVotes.length}</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background:CARD, borderRadius:'20px', padding:'40px 14px', textAlign:'center', border:`1px solid ${YB}` }}>
+            <div style={{ fontSize:'13px', color:'white', opacity:0.4 }}>
+              {activeTab==='🔥 오늘의 이슈' ? '운영자가 등록한 이슈가 없어요' : '아직 투표가 없어요'}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 인디케이터 */}
+      <div style={{ display:'flex', justifyContent:'center', gap:'4px', padding:'10px 0 12px' }}>
+        {currentVotes.map((_,i) => (
+          <div key={i} onClick={() => setHotIdx(i)} style={{
+            width: i===hotIdx ? '18px' : '5px', height:'5px', borderRadius:'999px', cursor:'pointer',
+            background: i===hotIdx ? Y : 'rgba(255,255,255,0.15)', transition:'all 0.25s',
+          }} />
+        ))}
       </div>
 
       {/* 실시간 결정 */}
-      <div style={{ padding:'12px 0 14px', borderBottom:'0.5px solid rgba(255,255,255,0.06)', marginTop:'2px' }}>
+      <div style={{ borderTop:'0.5px solid rgba(255,255,255,0.06)', paddingTop:'12px' }}>
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'0 16px', marginBottom:'12px' }}>
-          <div style={{ display:'flex', alignItems:'center', gap:'5px' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
             <div style={{ width:'7px', height:'7px', borderRadius:'50%', background:Y }} />
-            <span style={{ fontSize:'14px', fontWeight:900, color:'white' }}>⚡ 실시간 결정</span>
-            <span style={{ fontSize:'11px', fontWeight:700, color:Y }}>{realtimeVotes.length}개</span>
+            <span style={{ fontSize:'15px', fontWeight:900, color:'white' }}>⚡ 실시간 결정</span>
+            <span style={{ fontSize:'12px', fontWeight:700, color:Y }}>{realtimeVotes.length}개</span>
           </div>
-          <span onClick={() => router.push('/realtime')} style={{ fontSize:'11px', color:'white', opacity:0.4, cursor:'pointer' }}>더보기 ›</span>
+          <span onClick={() => router.push('/realtime')} style={{ fontSize:'11px', color:'white', opacity:0.35, cursor:'pointer' }}>더보기 ›</span>
         </div>
 
-        <div style={{ display:'flex', gap:'10px', padding:'0 16px', overflowX:'auto', scrollbarWidth:'none' }}>
-          <div onClick={() => router.push('/realtime/new')} style={{ flexShrink:0, width:'110px', background:CARD, borderRadius:'14px', padding:'12px', border:`1.5px dashed ${YB}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'6px', cursor:'pointer' }}>
-            <div style={{ width:'32px', height:'32px', borderRadius:'50%', background:YS, border:`1.5px solid ${YB}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px' }}>💭</div>
+        <div style={{ display:'flex', gap:'10px', padding:'0 16px 16px', overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' } as any}>
+          <div onClick={() => router.push('/realtime/new')} style={{ flexShrink:0, width:'110px', background:CARD, borderRadius:'16px', padding:'14px', border:`1.5px dashed ${YB}`, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:'6px', cursor:'pointer' }}>
+            <div style={{ width:'34px', height:'34px', borderRadius:'50%', background:YS, border:`1.5px solid ${YB}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px' }}>💭</div>
             <div style={{ fontSize:'11px', fontWeight:900, color:'white', textAlign:'center', lineHeight:1.4 }}>내 고민<br />올리기</div>
             <div style={{ fontSize:'8px', color:'white', opacity:0.4 }}>1시간 후 삭제</div>
             <div style={{ background:Y, color:'#0A0A0A', borderRadius:'999px', padding:'4px 10px', fontSize:'9px', fontWeight:900 }}>+ 올리기</div>
@@ -315,18 +332,18 @@ export default function Home() {
             const timeLeft = v.expires_at ? new Date(v.expires_at).getTime() - now : 0
             const urgent = timeLeft > 0 && timeLeft < 300000
             return (
-              <div key={v.id} style={{ flexShrink:0, width:'200px', background:CARD, borderRadius:'14px', padding:'12px', border:`1px solid ${YB}`, position:'relative', overflow:'hidden' }}>
+              <div key={v.id} style={{ flexShrink:0, width:'210px', background:CARD, borderRadius:'16px', padding:'13px', border:`1px solid ${YB}`, position:'relative', overflow:'hidden' }}>
                 <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px' }}>
                   <div style={{ display:'inline-flex', alignItems:'center', gap:'3px', background:YS, borderRadius:'999px', padding:'2px 7px', border:`1px solid ${YB}` }}>
                     <div style={{ width:'4px', height:'4px', borderRadius:'50%', background:Y }} />
                     <span style={{ fontSize:'7px', fontWeight:900, color:Y }}>LIVE</span>
                   </div>
-                  <span style={{ fontSize:'15px', fontWeight:900, fontVariantNumeric:'tabular-nums', color: timeLeft<=0 ? 'white' : urgent ? R : Y, opacity: timeLeft<=0 ? 0.4 : 1, letterSpacing:'-0.02em' }}>
+                  <span style={{ fontSize:'16px', fontWeight:900, fontVariantNumeric:'tabular-nums', color: timeLeft<=0 ? 'white' : urgent ? R : Y, opacity: timeLeft<=0 ? 0.4 : 1, letterSpacing:'-0.02em' }}>
                     ⏱ {fmtTimer(timeLeft)}
                   </span>
                 </div>
                 <div style={{ fontSize:'9px', color:'white', opacity:0.4, marginBottom:'5px' }}>{fmt(v.total)}명 참여</div>
-                <div onClick={() => router.push(`/vote/${v.id}`)} style={{ fontSize:'12px', fontWeight:900, color:'white', lineHeight:1.35, marginBottom:'10px', cursor:'pointer' }}>
+                <div onClick={() => router.push(`/vote/${v.id}`)} style={{ fontSize:'13px', fontWeight:900, color:'white', lineHeight:1.35, marginBottom:'10px', cursor:'pointer' }}>
                   {v.question}
                 </div>
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'6px', marginBottom:'8px' }}>
@@ -337,14 +354,14 @@ export default function Home() {
                     <div key={opt.side} onClick={() => handleVote(v.id, opt.side)} style={{
                       background: isVoted===opt.side ? opt.bg : 'rgba(255,255,255,0.04)',
                       border:`1.5px solid ${isVoted===opt.side ? opt.bd : 'rgba(255,255,255,0.08)'}`,
-                      borderRadius:'8px', padding:'8px 4px', textAlign:'center',
+                      borderRadius:'10px', padding:'8px 4px', textAlign:'center',
                       cursor: isVoted ? 'default' : 'pointer',
                       opacity: isVoted && isVoted!==opt.side ? 0.35 : 1,
                       transition:'all 0.2s',
                     }}>
-                      <div style={{ fontSize:'16px', marginBottom:'3px' }}>{opt.emoji}</div>
+                      <div style={{ fontSize:'18px', marginBottom:'3px' }}>{opt.emoji}</div>
                       <div style={{ fontSize:'9px', fontWeight:700, color:'white', marginBottom:'3px' }}>{opt.name}</div>
-                      <div style={{ fontSize:'13px', fontWeight:900, color:opt.ac }}>{opt.pct}%</div>
+                      <div style={{ fontSize:'14px', fontWeight:900, color:opt.ac }}>{opt.pct}%</div>
                     </div>
                   ))}
                 </div>
@@ -356,9 +373,7 @@ export default function Home() {
                   <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={commentVoteId===v.id ? Y : 'rgba(255,255,255,0.3)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                   </svg>
-                  <span style={{ fontSize:'9px', color: commentVoteId===v.id ? Y : 'rgba(255,255,255,0.3)', fontWeight:700 }}>
-                    댓글 {commentVoteId===v.id ? '▲' : '▼'}
-                  </span>
+                  <span style={{ fontSize:'9px', color: commentVoteId===v.id ? Y : 'rgba(255,255,255,0.3)', fontWeight:700 }}>댓글 {commentVoteId===v.id ? '▲' : '▼'}</span>
                 </div>
                 {commentVoteId===v.id && (
                   <div style={{ marginTop:'8px', borderTop:'0.5px solid rgba(255,255,255,0.08)', paddingTop:'8px' }}>
@@ -400,9 +415,9 @@ export default function Home() {
       </div>
 
       {/* 최신 투표 */}
-      <div style={{ marginTop:'2px', paddingBottom:'100px' }}>
+      <div style={{ borderTop:'0.5px solid rgba(255,255,255,0.06)', paddingBottom:'100px' }}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'12px 16px 8px' }}>
-          <span style={{ fontSize:'14px', fontWeight:900, color:'white' }}>🆕 최신 투표</span>
+          <span style={{ fontSize:'15px', fontWeight:900, color:'white' }}>🆕 최신 투표</span>
           <span style={{ fontSize:'11px', color:'white', opacity:0.35 }}>{allLatest.length}개</span>
         </div>
 
@@ -412,9 +427,8 @@ export default function Home() {
 
         {allLatest.map((v, i) => (
           <div key={v.id}>
-            {/* 광고 - 3번째, 7번째 */}
             {(i === 2 || i === 6) && (
-              <div style={{ margin:'4px 16px 4px', background: ADS[i===2?0:1].bg, borderRadius:'14px', padding:'12px 14px', border:`1px solid ${ADS[i===2?0:1].border}`, display:'flex', alignItems:'center', gap:'12px' }}>
+              <div style={{ margin:'4px 12px', background: ADS[i===2?0:1].bg, borderRadius:'14px', padding:'12px 14px', border:`1px solid ${ADS[i===2?0:1].border}`, display:'flex', alignItems:'center', gap:'12px' }}>
                 <div style={{ width:'44px', height:'44px', borderRadius:'12px', background: ADS[i===2?0:1].bg, border:`1px solid ${ADS[i===2?0:1].border}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0 }}>
                   {ADS[i===2?0:1].emoji}
                 </div>
@@ -429,22 +443,21 @@ export default function Home() {
                 <div style={{ fontSize:'10px', fontWeight:800, color: ADS[i===2?0:1].color, flexShrink:0 }}>{ADS[i===2?0:1].btn}</div>
               </div>
             )}
-            {/* 투표 카드 전체 클릭 */}
             <div onClick={() => router.push(`/vote/${v.id}`)} style={{ padding:'12px 16px', borderBottom:'0.5px solid rgba(255,255,255,0.05)', cursor:'pointer' }}>
-              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'5px' }}>
+              <div style={{ display:'flex', justifyContent:'space-between', marginBottom:'4px' }}>
                 <span onClick={e => { e.stopPropagation(); router.push(`/category/${encodeURIComponent(v.category)}`) }}
-                  style={{ fontSize:'10px', fontWeight:700, color:'white', opacity:0.45, cursor:'pointer' }}>{v.category}</span>
-                <span style={{ fontSize:'9px', color:'white', opacity:0.3 }}>{timeAgo(v.created_at)}</span>
+                  style={{ fontSize:'10px', fontWeight:700, color:'white', opacity:0.4, cursor:'pointer' }}>{v.category}</span>
+                <span style={{ fontSize:'9px', color:'white', opacity:0.25 }}>{timeAgo(v.created_at)}</span>
               </div>
-              <div style={{ fontSize:'14px', fontWeight:800, color:'white', marginBottom:'8px', letterSpacing:'-0.01em' }}>{v.question}</div>
-              <div style={{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px' }}>
-                <span style={{ fontSize:'11px', fontWeight:700, padding:'4px 12px', borderRadius:'999px', background:YS, color:Y, border:`1px solid ${YB}` }}>{v.option_a}</span>
+              <div style={{ fontSize:'14px', fontWeight:800, color:'white', marginBottom:'8px', letterSpacing:'-0.01em', lineHeight:1.35 }}>{v.question}</div>
+              <div style={{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'6px' }}>
+                <span style={{ fontSize:'11px', fontWeight:700, padding:'3px 10px', borderRadius:'999px', background:YS, color:Y, border:`1px solid ${YB}` }}>{v.option_a}</span>
                 <span style={{ fontSize:'10px', fontWeight:900, color:'white', opacity:0.2 }}>vs</span>
-                <span style={{ fontSize:'11px', fontWeight:700, padding:'4px 12px', borderRadius:'999px', background:RS, color:R, border:`1px solid ${RB}` }}>{v.option_b}</span>
+                <span style={{ fontSize:'11px', fontWeight:700, padding:'3px 10px', borderRadius:'999px', background:RS, color:R, border:`1px solid ${RB}` }}>{v.option_b}</span>
               </div>
-              <div style={{ display:'flex', alignItems:'center', gap:'8px' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
                 <span style={{ fontSize:'10px', color:'white', opacity:0.35 }}>👥 {fmt(v.total)}명</span>
-                {v.total>100 && <span style={{ fontSize:'8px', fontWeight:800, padding:'2px 7px', borderRadius:'999px', background:YS, color:Y }}>인기</span>}
+                {v.total>100 && <span style={{ fontSize:'8px', fontWeight:800, padding:'2px 6px', borderRadius:'999px', background:YS, color:Y }}>🔥 인기</span>}
               </div>
             </div>
           </div>
