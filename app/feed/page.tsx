@@ -52,7 +52,7 @@ const StatsIcon = () => (
   </svg>
 )
 
-const SHEET_H = 44 // vh - 댓글창 높이 (질문 안 가리게)
+const SHEET_H = 44
 
 export default function Feed() {
   const router = useRouter()
@@ -71,8 +71,14 @@ export default function Feed() {
   const containerRef = useRef<HTMLDivElement>(null)
   const commentInputRef = useRef<HTMLInputElement>(null)
 
+  // 시트 드래그용
+  const sheetDragStartY = useRef(0)
+  const sheetDragOffset = useRef(0)
+  const [sheetTranslateY, setSheetTranslateY] = useState(0)
+  const [isSheetDragging, setIsSheetDragging] = useState(false)
+
   const [showComments, setShowComments] = useState(false)
-  const [commentsMounted, setCommentsMounted] = useState(false) // 슬라이드업 트리거용
+  const [commentsMounted, setCommentsMounted] = useState(false)
   const [showStats, setShowStats] = useState(false)
   const [statsMounted, setStatsMounted] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
@@ -83,6 +89,7 @@ export default function Feed() {
   const [slideOffset, setSlideOffset] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
   const [keyboardHeight, setKeyboardHeight] = useState(0)
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
 
   useEffect(() => { fetchVotes() }, [])
 
@@ -91,7 +98,13 @@ export default function Feed() {
     if (!vv) return
     const handler = () => {
       const kbHeight = window.innerHeight - vv.height
-      setKeyboardHeight(kbHeight > 0 ? kbHeight : 0)
+      if (kbHeight > 100) {
+        setKeyboardHeight(kbHeight)
+        setIsKeyboardOpen(true)
+      } else {
+        setKeyboardHeight(0)
+        setIsKeyboardOpen(false)
+      }
     }
     vv.addEventListener('resize', handler)
     return () => vv.removeEventListener('resize', handler)
@@ -202,26 +215,52 @@ export default function Feed() {
 
   function openComments() {
     setShowStats(false); setStatsMounted(false)
+    setSheetTranslateY(0); setIsSheetDragging(false)
     setShowComments(true)
     if (v) fetchComments(v.id)
-    // 마운트 후 한 프레임 뒤에 mounted=true → 슬라이드업 트리거
     requestAnimationFrame(() => requestAnimationFrame(() => {
       setCommentsMounted(true)
-      setTimeout(() => commentInputRef.current?.focus(), 350)
     }))
   }
 
   function openStats() {
     setShowComments(false); setCommentsMounted(false)
+    setSheetTranslateY(0); setIsSheetDragging(false)
     setShowStats(true)
     requestAnimationFrame(() => requestAnimationFrame(() => setStatsMounted(true)))
   }
 
   function closeSheets() {
     setCommentsMounted(false); setStatsMounted(false)
+    setSheetTranslateY(0)
     setTimeout(() => { setShowComments(false); setShowStats(false) }, 300)
-    setKeyboardHeight(0)
+    setKeyboardHeight(0); setIsKeyboardOpen(false)
     commentInputRef.current?.blur()
+  }
+
+  // 시트 드래그 핸들러
+  function onSheetDragStart(e: React.TouchEvent) {
+    sheetDragStartY.current = e.touches[0].clientY
+    sheetDragOffset.current = 0
+    setIsSheetDragging(true)
+  }
+  function onSheetDragMove(e: React.TouchEvent) {
+    const dy = e.touches[0].clientY - sheetDragStartY.current
+    if (dy > 0) {
+      sheetDragOffset.current = dy
+      setSheetTranslateY(dy)
+    }
+  }
+  function onSheetDragEnd() {
+    setIsSheetDragging(false)
+    if (sheetDragOffset.current > 80) {
+      // 충분히 아래로 드래그 → 닫기
+      closeSheets()
+    } else {
+      // 복귀
+      setSheetTranslateY(0)
+    }
+    sheetDragOffset.current = 0
   }
 
   function handleShare() {
@@ -237,6 +276,10 @@ export default function Feed() {
   const likeCount = v ? (likeCounts[v.id] || 0) : 0
   const sheetOpen = showComments || showStats
   const sheetH = `${SHEET_H}vh`
+
+  // 댓글창 높이: 키보드 열려도 고정, 키보드 위로만 올라감
+  const commentSheetBottom = isKeyboardOpen ? keyboardHeight : 0
+  const commentSheetHeight = `${SHEET_H}vh`
 
   if (loading) return (
     <div style={{ maxWidth: '390px', margin: '0 auto', height: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0A' }}>
@@ -266,15 +309,7 @@ export default function Feed() {
         .animated-bg {
           background: linear-gradient(135deg, #0d0d1a, #2a0a3e, #0a2a1a, #3e1a00, #001a3e, #1a001a);
           background-size: 600% 600%;
-          animation: gradMove 3s ease infinite;
-        }
-        /* 시트 슬라이드업 */
-        .sheet-enter {
-          transform: translateY(100%);
-          transition: transform 0.32s cubic-bezier(0.32, 0.72, 0, 1);
-        }
-        .sheet-enter-active {
-          transform: translateY(0%);
+          animation: gradMove 5s ease infinite;
         }
       `}</style>
 
@@ -358,7 +393,6 @@ export default function Feed() {
               <div style={{ fontSize: '11px', fontWeight: 800, color: Y, marginBottom: '6px', letterSpacing: '0.04em' }}>{v.category}</div>
               <div style={{ fontSize: sheetOpen ? '15px' : '22px', fontWeight: 900, color: 'white', lineHeight: 1.3, marginBottom: '6px', letterSpacing: '-0.03em', transition: 'font-size 0.3s' }}>{v.question}</div>
               <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: sheetOpen ? '10px' : '20px', transition: 'all 0.3s' }}>{fmt(v.total)}명 참여</div>
-
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {[
                   { side: 'a' as const, name: v.option_a, emoji: v.emoji_a, pct: v.pa },
@@ -384,7 +418,6 @@ export default function Feed() {
                   </div>
                 ))}
               </div>
-
               {isVoted && (
                 <div style={{ height: '2px', background: 'rgba(255,255,255,0.08)', borderRadius: '999px', overflow: 'hidden', display: 'flex', marginTop: '8px' }}>
                   <div style={{ width: `${v.pa}%`, background: Y, transition: 'width 0.8s' }} />
@@ -404,7 +437,6 @@ export default function Feed() {
                   {likeCount > 0 ? likeCount : '좋아요'}
                 </span>
               </div>
-
               <div onClick={openComments} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={showComments ? Y : 'white'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
@@ -413,12 +445,10 @@ export default function Feed() {
                   {v.comments_count > 0 ? v.comments_count : '댓글'}
                 </span>
               </div>
-
               <div onClick={handleShare} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
                 <ShareIcon />
                 <span style={{ fontSize: '10px', fontWeight: 600, color: sharedId === v.id ? Y : 'rgba(255,255,255,0.6)' }}>{sharedId === v.id ? '복사됨' : '공유'}</span>
               </div>
-
               <div onClick={openStats} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
                 <StatsIcon />
                 <span style={{ fontSize: '10px', fontWeight: 600, color: showStats ? Y : 'rgba(255,255,255,0.6)' }}>통계</span>
@@ -433,7 +463,6 @@ export default function Feed() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>
             </div>
           )}
-
           {!sheetOpen && (
             <div style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {votes.map((_, i) => (
@@ -451,31 +480,46 @@ export default function Feed() {
         </div>
       </div>
 
-      {/* 댓글 시트 - 스르륵 올라오기 */}
+      {/* ── 댓글 시트 ── */}
       {showComments && (
         <div
-          className="sheet-enter"
           style={{
             position: 'fixed',
             left: '50%',
-            transform: commentsMounted ? 'translateX(-50%) translateY(0%)' : 'translateX(-50%) translateY(100%)',
-            transition: 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
             width: '100%', maxWidth: '390px',
-            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0px',
-            height: keyboardHeight > 0 ? '48vh' : sheetH,
+            bottom: `${commentSheetBottom}px`,
+            height: commentSheetHeight,
             zIndex: 100,
             display: 'flex', flexDirection: 'column',
             background: 'rgba(10,8,20,0.98)',
             borderRadius: '20px 20px 0 0',
             border: '0.5px solid rgba(255,255,255,0.1)',
             backdropFilter: 'blur(20px)',
+            // 슬라이드업 + 드래그
+            transform: commentsMounted
+              ? `translateX(-50%) translateY(${sheetTranslateY}px)`
+              : 'translateX(-50%) translateY(100%)',
+            transition: isSheetDragging
+              ? 'none'
+              : 'transform 0.32s cubic-bezier(0.32,0.72,0,1)',
           }}
         >
-          <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+          {/* 드래그 핸들 막대 */}
+          <div
+            onTouchStart={onSheetDragStart}
+            onTouchMove={onSheetDragMove}
+            onTouchEnd={onSheetDragEnd}
+            style={{ padding: '10px 0 6px', display: 'flex', justifyContent: 'center', cursor: 'grab', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '4px', borderRadius: '999px', background: 'rgba(255,255,255,0.2)' }} />
+          </div>
+
+          {/* 헤더 */}
+          <div style={{ padding: '4px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
             <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>💬 댓글 {v.comments_count}개</span>
             <div onClick={closeSheets} style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>✕</div>
           </div>
 
+          {/* 댓글 목록 */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
             {commentsLoading ? (
               <div style={{ textAlign: 'center', padding: '20px', fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>불러오는 중...</div>
@@ -514,7 +558,14 @@ export default function Feed() {
             ))}
           </div>
 
-          <div style={{ padding: '8px 12px 16px', borderTop: '0.5px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, background: 'rgba(10,8,20,0.98)' }}>
+          {/* 입력창 - 키보드 열려도 크기 고정 */}
+          <div style={{
+            padding: '8px 12px 16px',
+            borderTop: '0.5px solid rgba(255,255,255,0.08)',
+            display: 'flex', gap: '8px', alignItems: 'center',
+            flexShrink: 0,
+            background: 'rgba(10,8,20,0.98)',
+          }}>
             <input
               ref={commentInputRef}
               value={commentText}
@@ -523,9 +574,11 @@ export default function Feed() {
               disabled={!isVoted}
               onKeyDown={e => e.key === 'Enter' && handleComment()}
               style={{
-                flex: 1, background: 'rgba(255,255,255,0.08)',
+                flex: 1,
+                background: 'rgba(255,255,255,0.08)',
                 border: '0.5px solid rgba(255,255,255,0.1)',
-                borderRadius: '22px', padding: '11px 16px',
+                borderRadius: '22px',
+                padding: '11px 16px',
                 fontSize: '13px', color: 'white', outline: 'none',
                 fontFamily: '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif',
               }}
@@ -534,7 +587,7 @@ export default function Feed() {
               width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
               background: commentText && isVoted ? Y : 'rgba(255,255,255,0.08)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              transition: 'all 0.2s',
+              transition: 'background 0.2s',
             }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
                 stroke={commentText && isVoted ? '#0A0A0A' : 'rgba(255,255,255,0.3)'}
@@ -546,24 +599,35 @@ export default function Feed() {
         </div>
       )}
 
-      {/* 통계 시트 - 스르륵 올라오기 */}
+      {/* ── 통계 시트 ── */}
       {showStats && (
         <div style={{
           position: 'fixed', left: '50%',
-          transform: statsMounted ? 'translateX(-50%) translateY(0%)' : 'translateX(-50%) translateY(100%)',
-          transition: 'transform 0.32s cubic-bezier(0.32, 0.72, 0, 1)',
           width: '100%', maxWidth: '390px',
           bottom: 0, height: sheetH, zIndex: 100,
           background: 'rgba(10,8,20,0.98)', borderRadius: '20px 20px 0 0',
           overflow: 'hidden', backdropFilter: 'blur(20px)',
           border: '0.5px solid rgba(255,255,255,0.1)',
           display: 'flex', flexDirection: 'column',
+          transform: statsMounted
+            ? `translateX(-50%) translateY(${sheetTranslateY}px)`
+            : 'translateX(-50%) translateY(100%)',
+          transition: isSheetDragging ? 'none' : 'transform 0.32s cubic-bezier(0.32,0.72,0,1)',
         }}>
-          <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+          {/* 드래그 핸들 막대 */}
+          <div
+            onTouchStart={onSheetDragStart}
+            onTouchMove={onSheetDragMove}
+            onTouchEnd={onSheetDragEnd}
+            style={{ padding: '10px 0 6px', display: 'flex', justifyContent: 'center', cursor: 'grab', flexShrink: 0 }}>
+            <div style={{ width: '36px', height: '4px', borderRadius: '999px', background: 'rgba(255,255,255,0.2)' }} />
+          </div>
+
+          <div style={{ padding: '4px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
             <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>📊 통계</span>
             <div onClick={closeSheets} style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>✕</div>
           </div>
-          <div style={{ padding: '16px', overflowY: 'auto' }}>
+          <div style={{ padding: '16px', overflowY: 'auto', flex: 1 }}>
             <div style={{ textAlign: 'center', marginBottom: '16px' }}>
               <div style={{ fontSize: '28px', fontWeight: 900, color: 'white', marginBottom: '2px' }}>{fmt(v.total)}명</div>
               <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)' }}>총 참여자</div>
