@@ -21,26 +21,19 @@ function fmt(n: number) {
   return n >= 10000 ? (n / 10000).toFixed(1) + '만' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : '' + n
 }
 
-// 하트 폭죽
 function HeartBurst({ active }: { active: boolean }) {
   if (!active) return null
-  const particles = [
-    { angle: 0 }, { angle: 45 }, { angle: 90 }, { angle: 135 },
-    { angle: 180 }, { angle: 225 }, { angle: 270 }, { angle: 315 },
-  ]
+  const angles = [0, 45, 90, 135, 180, 225, 270, 315]
   return (
     <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}>
-      <style>{`
-        @keyframes burst { 0%{transform:translate(0,0) scale(1);opacity:1} 100%{transform:translate(var(--tx),var(--ty)) scale(0);opacity:0} }
-      `}</style>
-      {particles.map((p, i) => (
+      <style>{angles.map((a, i) => `
+        @keyframes hbf${i}{0%{transform:translate(0,0) scale(1);opacity:1}100%{transform:translate(${Math.round(Math.cos(a*Math.PI/180)*22)}px,${Math.round(Math.sin(a*Math.PI/180)*22)}px) scale(0);opacity:0}}
+      `).join('')}</style>
+      {angles.map((a, i) => (
         <div key={i} style={{
           position: 'absolute', width: '5px', height: '5px', borderRadius: '50%',
-          background: i % 2 === 0 ? Y : '#FF3B3B',
-          animation: 'burst 0.5s ease-out forwards',
-          // @ts-ignore
-          '--tx': `${Math.cos(p.angle * Math.PI / 180) * 22}px`,
-          '--ty': `${Math.sin(p.angle * Math.PI / 180) * 22}px`,
+          background: i % 2 === 0 ? Y : '#FFE44D',
+          animation: `hbf${i} 0.5s ease-out forwards`,
         }} />
       ))}
     </div>
@@ -74,6 +67,7 @@ export default function Feed() {
   const touchStartX = useRef(0)
   const isSwiping = useRef(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const commentInputRef = useRef<HTMLInputElement>(null)
 
   const [showComments, setShowComments] = useState(false)
   const [showStats, setShowStats] = useState(false)
@@ -85,7 +79,22 @@ export default function Feed() {
   const [slideOffset, setSlideOffset] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
 
+  // 키보드 높이 감지
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+
   useEffect(() => { fetchVotes() }, [])
+
+  // 키보드 올라올 때 감지 (visualViewport API)
+  useEffect(() => {
+    const vv = window.visualViewport
+    if (!vv) return
+    const handler = () => {
+      const kbHeight = window.innerHeight - vv.height
+      setKeyboardHeight(kbHeight > 0 ? kbHeight : 0)
+    }
+    vv.addEventListener('resize', handler)
+    return () => vv.removeEventListener('resize', handler)
+  }, [])
 
   useEffect(() => {
     const el = containerRef.current
@@ -192,9 +201,20 @@ export default function Feed() {
     }
   }
 
-  function openComments() { setShowStats(false); setShowComments(true); if (v) fetchComments(v.id) }
+  function openComments() {
+    setShowStats(false)
+    setShowComments(true)
+    if (v) fetchComments(v.id)
+    // 약간 딜레이 후 포커스 (시트 애니메이션 후)
+    setTimeout(() => commentInputRef.current?.focus(), 400)
+  }
   function openStats() { setShowComments(false); setShowStats(true) }
-  function closeSheets() { setShowComments(false); setShowStats(false) }
+  function closeSheets() {
+    setShowComments(false)
+    setShowStats(false)
+    setKeyboardHeight(0)
+    commentInputRef.current?.blur()
+  }
 
   function handleShare() {
     if (!v) return
@@ -208,11 +228,9 @@ export default function Feed() {
   const isLiked = v ? liked[v.id] : false
   const likeCount = v ? (likeCounts[v.id] || 0) : 0
   const sheetOpen = showComments || showStats
-  const videoHeight = sheetOpen ? '45vh' : '100svh'
 
   if (loading) return (
     <div style={{ maxWidth: '390px', margin: '0 auto', height: '100svh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0A0A0A' }}>
-      <style>{`@keyframes gradMove{0%{background-position:0% 50%}50%{background-position:100% 50%}100%{background-position:0% 50%}}`}</style>
       <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.4)' }}>불러오는 중...</div>
     </div>
   )
@@ -228,21 +246,28 @@ export default function Feed() {
 
   return (
     <>
-      {/* 움직이는 그라디언트 배경 전역 스타일 */}
       <style>{`
         @keyframes gradMove {
-          0% { background-position: 0% 50% }
-          50% { background-position: 100% 50% }
-          100% { background-position: 0% 50% }
-        }
-        @keyframes burst {
-          0% { transform: translate(0,0) scale(1); opacity: 1; }
-          100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+          0%{background-position:0% 50%} 50%{background-position:100% 50%} 100%{background-position:0% 50%}
         }
         .animated-bg {
           background: linear-gradient(135deg, #0A0A0A, #1a0a2e, #0a1a2e, #1a1a0a, #2e0a1a, #0A0A0A);
           background-size: 400% 400%;
           animation: gradMove 8s ease infinite;
+        }
+        .comment-sheet {
+          position: fixed;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 100%;
+          max-width: 390px;
+          z-index: 100;
+          display: flex;
+          flex-direction: column;
+          background: rgba(10,8,20,0.98);
+          border-radius: 20px 20px 0 0;
+          border: 0.5px solid rgba(255,255,255,0.08);
+          backdrop-filter: blur(20px);
         }
       `}</style>
 
@@ -309,8 +334,12 @@ export default function Feed() {
           </>
         )}
 
-        {/* 투표 영역 */}
-        <div style={{ height: videoHeight, transition: 'height 0.35s cubic-bezier(0.4,0,0.2,1)', position: 'relative', overflow: 'hidden' }}>
+        {/* 투표 영역 - 댓글 열리면 위로 올라감 */}
+        <div style={{
+          height: sheetOpen ? '42vh' : '100svh',
+          transition: 'height 0.35s cubic-bezier(0.4,0,0.2,1)',
+          position: 'relative', overflow: 'hidden',
+        }}>
           <div style={{
             position: 'absolute', inset: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -320,8 +349,8 @@ export default function Feed() {
           }}>
             <div style={{ flex: 1, padding: '0 64px 0 20px' }}>
               <div style={{ fontSize: '11px', fontWeight: 800, color: Y, marginBottom: '6px', letterSpacing: '0.04em' }}>{v.category}</div>
-              <div style={{ fontSize: sheetOpen ? '16px' : '22px', fontWeight: 900, color: 'white', lineHeight: 1.3, marginBottom: '6px', letterSpacing: '-0.03em', transition: 'font-size 0.3s' }}>{v.question}</div>
-              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: sheetOpen ? '14px' : '20px', transition: 'all 0.3s' }}>{fmt(v.total)}명 참여</div>
+              <div style={{ fontSize: sheetOpen ? '15px' : '22px', fontWeight: 900, color: 'white', lineHeight: 1.3, marginBottom: '6px', letterSpacing: '-0.03em', transition: 'font-size 0.3s' }}>{v.question}</div>
+              <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', marginBottom: sheetOpen ? '10px' : '20px', transition: 'all 0.3s' }}>{fmt(v.total)}명 참여</div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {[
@@ -329,7 +358,7 @@ export default function Feed() {
                   { side: 'b' as const, name: v.option_b, emoji: v.emoji_b, pct: 100 - v.pa },
                 ].map(opt => (
                   <div key={opt.side} onClick={() => handleVote(v.id, opt.side)} style={{
-                    borderRadius: '12px', padding: sheetOpen ? '10px 14px' : '14px 16px',
+                    borderRadius: '12px', padding: sheetOpen ? '8px 12px' : '14px 16px',
                     display: 'flex', alignItems: 'center', gap: '10px',
                     cursor: isVoted ? 'default' : 'pointer',
                     border: `1.5px solid ${isVoted === opt.side ? Y : isVoted ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.12)'}`,
@@ -339,12 +368,12 @@ export default function Feed() {
                     boxShadow: isVoted === opt.side ? `0 0 20px rgba(255,215,0,0.2)` : 'none',
                   }}>
                     {isVoted && <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${opt.pct}%`, background: isVoted === opt.side ? 'rgba(255,215,0,0.08)' : 'rgba(255,255,255,0.03)', transition: 'width 0.8s' }} />}
-                    <span style={{ fontSize: sheetOpen ? '20px' : '24px', flexShrink: 0, transition: 'font-size 0.3s' }}>{opt.emoji}</span>
+                    <span style={{ fontSize: sheetOpen ? '18px' : '24px', flexShrink: 0, transition: 'font-size 0.3s' }}>{opt.emoji}</span>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontSize: '7px', fontWeight: 900, color: 'rgba(255,255,255,0.2)', marginBottom: '1px' }}>{opt.side.toUpperCase()}</div>
-                      <div style={{ fontSize: sheetOpen ? '13px' : '15px', fontWeight: 800, color: 'white', transition: 'font-size 0.3s' }}>{opt.name}</div>
+                      <div style={{ fontSize: sheetOpen ? '12px' : '15px', fontWeight: 800, color: 'white', transition: 'font-size 0.3s' }}>{opt.name}</div>
                     </div>
-                    {isVoted && <div style={{ fontSize: '16px', fontWeight: 900, color: isVoted === opt.side ? Y : 'rgba(255,255,255,0.35)' }}>{opt.pct}%</div>}
+                    {isVoted && <div style={{ fontSize: '15px', fontWeight: 900, color: isVoted === opt.side ? Y : 'rgba(255,255,255,0.35)' }}>{opt.pct}%</div>}
                   </div>
                 ))}
               </div>
@@ -359,22 +388,19 @@ export default function Feed() {
 
             {/* 오른쪽 액션 버튼 */}
             <div style={{ position: 'absolute', right: '10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px' }}>
-
-              {/* 좋아요 - 폭죽 + 카운트 */}
+              {/* 좋아요 */}
               <div onClick={handleLike} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer', position: 'relative' }}>
                 <HeartBurst active={burstId === v.id} />
                 <svg width="28" height="28" viewBox="0 0 24 24"
-                  fill={isLiked ? Y : 'none'}
-                  stroke={Y} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
-                  style={{ transition: 'transform 0.2s', transform: isLiked ? 'scale(1.2)' : 'scale(1)' }}>
+                  fill={isLiked ? Y : 'none'} stroke={Y} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                 </svg>
-                <span style={{ fontSize: '10px', fontWeight: 700, color: isLiked ? Y : 'rgba(255,255,255,0.6)' }}>
+                <span style={{ fontSize: '10px', fontWeight: 700, color: isLiked ? Y : 'rgba(255,255,255,0.6)', minWidth: '30px', textAlign: 'center' }}>
                   {likeCount > 0 ? likeCount : '좋아요'}
                 </span>
               </div>
 
-              {/* 댓글 - 카운트 표시 */}
+              {/* 댓글 */}
               <div onClick={openComments} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
                 <svg width="28" height="28" viewBox="0 0 24 24" fill="none"
                   stroke={showComments ? Y : 'white'} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -421,140 +447,147 @@ export default function Feed() {
           )}
         </div>
 
-        {/* 댓글 시트 */}
-        {showComments && (
-          <div style={{ height: 'calc(55vh - 60px)', background: 'rgba(10,8,20,0.97)', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', overflow: 'hidden', backdropFilter: 'blur(20px)', border: '0.5px solid rgba(255,255,255,0.08)' }}>
-            {/* 헤더 - X 버튼 */}
-            <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
-              <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>💬 댓글 {v.comments_count}개</span>
-              <div onClick={closeSheets} style={{
-                width: '28px', height: '28px', borderRadius: '50%',
-                background: 'rgba(255,255,255,0.1)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', fontSize: '14px', color: 'rgba(255,255,255,0.6)',
-              }}>✕</div>
-            </div>
-
-            {/* 댓글 목록 */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
-              {commentsLoading ? (
-                <div style={{ textAlign: 'center', padding: '20px', fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>불러오는 중...</div>
-              ) : comments.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '30px', fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>
-                  {isVoted ? '첫 댓글을 달아보세요!' : '투표 후 댓글 달 수 있어요'}
-                </div>
-              ) : comments.map(c => (
-                <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'flex-end' }}>
-                  {/* 아바타 */}
-                  <div style={{
-                    width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,
-                    background: c.choice === 'a' ? YS : 'rgba(26,111,255,0.25)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '9px', fontWeight: 800,
-                    color: c.choice === 'a' ? '#B8860B' : '#4A8FFF',
-                    border: `1px solid ${c.choice === 'a' ? YB : 'rgba(26,111,255,0.3)'}`,
-                  }}>익</div>
-
-                  <div style={{ flex: 1 }}>
-                    {/* 파 뱃지 */}
-                    <span style={{
-                      fontSize: '8px', fontWeight: 800, padding: '2px 7px', borderRadius: '999px',
-                      background: c.choice === 'a' ? YS : 'rgba(26,111,255,0.2)',
-                      color: c.choice === 'a' ? '#B8860B' : '#4A8FFF',
-                      marginBottom: '4px', display: 'inline-block',
-                    }}>{c.choice === 'a' ? v.option_a : v.option_b}파</span>
-
-                    {/* 인스타 스타일 말풍선 - 둥글게 */}
-                    <div style={{
-                      background: 'rgba(255,255,255,0.08)',
-                      borderRadius: '18px 18px 18px 4px', // 인스타 스타일
-                      padding: '9px 13px',
-                      fontSize: '13px', color: 'rgba(255,255,255,0.9)',
-                      lineHeight: 1.5,
-                      backdropFilter: 'blur(4px)',
-                      border: '0.5px solid rgba(255,255,255,0.06)',
-                      display: 'inline-block',
-                      maxWidth: '100%',
-                    }}>{c.content}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* 입력창 */}
-            <div style={{ padding: '8px 12px 14px', borderTop: '0.5px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <input
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                placeholder={isVoted ? '댓글 달기...' : '먼저 투표해주세요!'}
-                disabled={!isVoted}
-                onKeyDown={e => e.key === 'Enter' && handleComment()}
-                style={{
-                  flex: 1, background: 'rgba(255,255,255,0.08)', border: '0.5px solid rgba(255,255,255,0.1)',
-                  borderRadius: '22px', padding: '11px 16px', fontSize: '13px', color: 'white',
-                  outline: 'none', fontFamily: 'inherit',
-                }}
-              />
-              <div onClick={handleComment} style={{
-                width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
-                background: commentText && isVoted ? Y : 'rgba(255,255,255,0.08)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-                transition: 'all 0.2s',
-              }}>
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
-                  stroke={commentText && isVoted ? '#0A0A0A' : 'rgba(255,255,255,0.3)'}
-                  strokeWidth="2.5" strokeLinecap="round">
-                  <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* 통계 시트 */}
-        {showStats && (
-          <div style={{ height: 'calc(55vh - 60px)', background: 'rgba(10,8,20,0.97)', borderRadius: '20px 20px 0 0', overflow: 'hidden', backdropFilter: 'blur(20px)', border: '0.5px solid rgba(255,255,255,0.08)' }}>
-            <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
-              <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>📊 통계</span>
-              <div onClick={closeSheets} style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>✕</div>
-            </div>
-            <div style={{ padding: '20px 16px' }}>
-              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
-                <div style={{ fontSize: '32px', fontWeight: 900, color: 'white', marginBottom: '4px' }}>{fmt(v.total)}명</div>
-                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>총 참여자</div>
-              </div>
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: Y }}>{v.option_a} {v.pa}%</span>
-                  <span style={{ fontSize: '12px', fontWeight: 800, color: '#4A8FFF' }}>{100 - v.pa}% {v.option_b}</span>
-                </div>
-                <div style={{ height: '8px', borderRadius: '999px', overflow: 'hidden', display: 'flex' }}>
-                  <div style={{ width: `${v.pa}%`, background: Y, transition: 'width 0.8s' }} />
-                  <div style={{ flex: 1, background: '#1A6FFF' }} />
-                </div>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                <div style={{ background: YS, border: `1px solid ${YB}`, borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '24px', marginBottom: '6px' }}>{v.emoji_a}</div>
-                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{v.option_a}</div>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: Y }}>{v.pa}%</div>
-                  <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{fmt(v.count_a)}명</div>
-                </div>
-                <div style={{ background: 'rgba(26,111,255,0.12)', border: '1px solid rgba(26,111,255,0.3)', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
-                  <div style={{ fontSize: '24px', marginBottom: '6px' }}>{v.emoji_b}</div>
-                  <div style={{ fontSize: '12px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{v.option_b}</div>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#4A8FFF' }}>{100 - v.pa}%</div>
-                  <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{fmt(v.count_b)}명</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
+        {/* BottomNav */}
         <div style={{ height: '60px', background: 'rgba(6,6,20,0.98)' }}>
           <BottomNav />
         </div>
       </div>
+
+      {/* 댓글 시트 - position fixed로 키보드 위에 뜨게 */}
+      {showComments && (
+        <div
+          className="comment-sheet"
+          style={{
+            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0px',
+            height: keyboardHeight > 0 ? '50vh' : 'calc(58vh - 60px)',
+            transition: 'bottom 0.25s ease, height 0.25s ease',
+          }}
+        >
+          {/* 헤더 */}
+          <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)', flexShrink: 0 }}>
+            <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>💬 댓글 {v.comments_count}개</span>
+            <div onClick={closeSheets} style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>✕</div>
+          </div>
+
+          {/* 댓글 목록 */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px' }}>
+            {commentsLoading ? (
+              <div style={{ textAlign: 'center', padding: '20px', fontSize: '12px', color: 'rgba(255,255,255,0.3)' }}>불러오는 중...</div>
+            ) : comments.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px', fontSize: '13px', color: 'rgba(255,255,255,0.3)' }}>
+                {isVoted ? '첫 댓글을 달아보세요!' : '투표 후 댓글 달 수 있어요'}
+              </div>
+            ) : comments.map(c => (
+              <div key={c.id} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'flex-end' }}>
+                <div style={{
+                  width: '26px', height: '26px', borderRadius: '50%', flexShrink: 0,
+                  background: c.choice === 'a' ? YS : 'rgba(26,111,255,0.25)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '9px', fontWeight: 800,
+                  color: c.choice === 'a' ? '#B8860B' : '#4A8FFF',
+                  border: `1px solid ${c.choice === 'a' ? YB : 'rgba(26,111,255,0.3)'}`,
+                }}>익</div>
+                <div style={{ flex: 1 }}>
+                  <span style={{
+                    fontSize: '8px', fontWeight: 800, padding: '2px 7px', borderRadius: '999px',
+                    background: c.choice === 'a' ? YS : 'rgba(26,111,255,0.2)',
+                    color: c.choice === 'a' ? '#B8860B' : '#4A8FFF',
+                    marginBottom: '4px', display: 'inline-block',
+                  }}>{c.choice === 'a' ? v.option_a : v.option_b}파</span>
+                  {/* 인스타 스타일 말풍선 */}
+                  <div style={{
+                    background: 'rgba(255,255,255,0.08)',
+                    borderRadius: '18px 18px 18px 4px',
+                    padding: '9px 13px',
+                    fontSize: '13px', color: 'rgba(255,255,255,0.9)',
+                    lineHeight: 1.5,
+                    border: '0.5px solid rgba(255,255,255,0.06)',
+                    display: 'inline-block', maxWidth: '100%',
+                  }}>{c.content}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* 입력창 - 항상 보이게 */}
+          <div style={{ padding: '8px 12px 16px', borderTop: '0.5px solid rgba(255,255,255,0.08)', display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0, background: 'rgba(10,8,20,0.98)' }}>
+            <input
+              ref={commentInputRef}
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              placeholder={isVoted ? '댓글 달기...' : '먼저 투표해주세요!'}
+              disabled={!isVoted}
+              onKeyDown={e => e.key === 'Enter' && handleComment()}
+              style={{
+                flex: 1, background: 'rgba(255,255,255,0.08)',
+                border: '0.5px solid rgba(255,255,255,0.1)',
+                borderRadius: '22px', padding: '11px 16px',
+                fontSize: '13px', color: 'white', outline: 'none',
+                fontFamily: '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif',
+              }}
+            />
+            <div onClick={handleComment} style={{
+              width: '38px', height: '38px', borderRadius: '50%', flexShrink: 0,
+              background: commentText && isVoted ? Y : 'rgba(255,255,255,0.08)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                stroke={commentText && isVoted ? '#0A0A0A' : 'rgba(255,255,255,0.3)'}
+                strokeWidth="2.5" strokeLinecap="round">
+                <line x1="12" y1="19" x2="12" y2="5" /><polyline points="5 12 12 5 19 12" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 통계 시트 - position fixed */}
+      {showStats && (
+        <div style={{
+          position: 'fixed', left: '50%', transform: 'translateX(-50%)',
+          width: '100%', maxWidth: '390px', bottom: 0, zIndex: 100,
+          height: 'calc(58vh - 60px)',
+          background: 'rgba(10,8,20,0.98)', borderRadius: '20px 20px 0 0',
+          overflow: 'hidden', backdropFilter: 'blur(20px)',
+          border: '0.5px solid rgba(255,255,255,0.08)',
+        }}>
+          <div style={{ padding: '12px 16px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '0.5px solid rgba(255,255,255,0.08)' }}>
+            <span style={{ fontSize: '14px', fontWeight: 800, color: 'white' }}>📊 통계</span>
+            <div onClick={closeSheets} style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '14px', color: 'rgba(255,255,255,0.6)' }}>✕</div>
+          </div>
+          <div style={{ padding: '20px 16px' }}>
+            <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+              <div style={{ fontSize: '32px', fontWeight: 900, color: 'white', marginBottom: '4px' }}>{fmt(v.total)}명</div>
+              <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>총 참여자</div>
+            </div>
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: Y }}>{v.option_a} {v.pa}%</span>
+                <span style={{ fontSize: '12px', fontWeight: 800, color: '#4A8FFF' }}>{100 - v.pa}% {v.option_b}</span>
+              </div>
+              <div style={{ height: '8px', borderRadius: '999px', overflow: 'hidden', display: 'flex' }}>
+                <div style={{ width: `${v.pa}%`, background: Y, transition: 'width 0.8s' }} />
+                <div style={{ flex: 1, background: '#1A6FFF' }} />
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <div style={{ background: YS, border: `1px solid ${YB}`, borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', marginBottom: '6px' }}>{v.emoji_a}</div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{v.option_a}</div>
+                <div style={{ fontSize: '24px', fontWeight: 900, color: Y }}>{v.pa}%</div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{fmt(v.count_a)}명</div>
+              </div>
+              <div style={{ background: 'rgba(26,111,255,0.12)', border: '1px solid rgba(26,111,255,0.3)', borderRadius: '14px', padding: '14px', textAlign: 'center' }}>
+                <div style={{ fontSize: '24px', marginBottom: '6px' }}>{v.emoji_b}</div>
+                <div style={{ fontSize: '12px', fontWeight: 800, color: 'white', marginBottom: '4px' }}>{v.option_b}</div>
+                <div style={{ fontSize: '24px', fontWeight: 900, color: '#4A8FFF' }}>{100 - v.pa}%</div>
+                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', marginTop: '2px' }}>{fmt(v.count_b)}명</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
