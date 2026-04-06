@@ -1,5 +1,5 @@
 ﻿'use client'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import { supabase } from '@/lib/supabase'
@@ -52,8 +52,11 @@ export default function Feed() {
   const [liked, setLiked] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
   const [menuOpen, setMenuOpen] = useState(false)
+
   const touchStartY = useRef(0)
   const touchStartX = useRef(0)
+  const isSwiping = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const [showComments, setShowComments] = useState(false)
   const [showStats, setShowStats] = useState(false)
@@ -62,7 +65,81 @@ export default function Feed() {
   const [commentsLoading, setCommentsLoading] = useState(false)
   const [sharedId, setSharedId] = useState<string | null>(null)
 
+  // 슬라이드 애니메이션용
+  const [slideOffset, setSlideOffset] = useState(0)
+  const [isAnimating, setIsAnimating] = useState(false)
+
   useEffect(() => { fetchVotes() }, [])
+
+  // passive: false로 터치 이벤트 등록 (preventDefault 허용)
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (showComments || showStats) return
+      touchStartY.current = e.touches[0].clientY
+      touchStartX.current = e.touches[0].clientX
+      isSwiping.current = false
+      setSlideOffset(0)
+    }
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (showComments || showStats) return
+      const dy = touchStartY.current - e.touches[0].clientY
+      const dx = Math.abs(touchStartX.current - e.touches[0].clientX)
+
+      // 세로 스와이프가 확실할 때만 스크롤 방지
+      if (Math.abs(dy) > 10 && dx < Math.abs(dy)) {
+        e.preventDefault()
+        isSwiping.current = true
+        setSlideOffset(-dy) // 손가락 따라 카드 이동
+      }
+    }
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (showComments || showStats || !isSwiping.current) return
+      const dy = touchStartY.current - e.changedTouches[0].clientY
+      const dx = Math.abs(touchStartX.current - e.changedTouches[0].clientX)
+
+      if (Math.abs(dy) > 60 && dx < 40) {
+        setIsAnimating(true)
+        if (dy > 0) {
+          // 위로 스와이프 → 다음
+          setSlideOffset(-window.innerHeight)
+          setTimeout(() => {
+            setCurrent(i => Math.min(i + 1, votes.length - 1))
+            setSlideOffset(0)
+            setIsAnimating(false)
+          }, 280)
+        } else {
+          // 아래로 스와이프 → 이전
+          setSlideOffset(window.innerHeight)
+          setTimeout(() => {
+            setCurrent(i => Math.max(i - 1, 0))
+            setSlideOffset(0)
+            setIsAnimating(false)
+          }, 280)
+        }
+      } else {
+        // 복귀 애니메이션
+        setIsAnimating(true)
+        setSlideOffset(0)
+        setTimeout(() => setIsAnimating(false), 200)
+      }
+      isSwiping.current = false
+    }
+
+    el.addEventListener('touchstart', handleTouchStart, { passive: true })
+    el.addEventListener('touchmove', handleTouchMove, { passive: false })
+    el.addEventListener('touchend', handleTouchEnd, { passive: true })
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart)
+      el.removeEventListener('touchmove', handleTouchMove)
+      el.removeEventListener('touchend', handleTouchEnd)
+    }
+  }, [showComments, showStats, votes.length])
 
   async function fetchVotes() {
     setLoading(true)
@@ -120,20 +197,6 @@ export default function Feed() {
     setTimeout(() => setSharedId(null), 2000)
   }
 
-  function onTouchStart(e: React.TouchEvent) {
-    touchStartY.current = e.touches[0].clientY
-    touchStartX.current = e.touches[0].clientX
-  }
-  function onTouchEnd(e: React.TouchEvent) {
-    if (showComments || showStats) return
-    const dy = touchStartY.current - e.changedTouches[0].clientY
-    const dx = Math.abs(touchStartX.current - e.changedTouches[0].clientX)
-    if (Math.abs(dy) > 50 && dx < 30) {
-      if (dy > 0) setCurrent(i => Math.min(i + 1, votes.length - 1))
-      else setCurrent(i => Math.max(i - 1, 0))
-    }
-  }
-
   const v = votes[current]
   const isVoted = v ? voted[v.id] : null
   const isLiked = v ? liked[v.id] : false
@@ -156,7 +219,15 @@ export default function Feed() {
   )
 
   return (
-    <div style={{ maxWidth: '390px', margin: '0 auto', height: '100vh', overflow: 'hidden', background: GRAD, position: 'relative', fontFamily: '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif' }}>
+    <div
+      ref={containerRef}
+      style={{
+        maxWidth: '390px', margin: '0 auto', height: '100vh',
+        overflow: 'hidden', background: GRAD, position: 'relative',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", sans-serif',
+        userSelect: 'none', // 스와이프 중 텍스트 선택 방지
+      }}
+    >
 
       {/* 다크 TopBar */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 50, padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(to bottom, rgba(10,5,30,0.9) 0%, transparent 100%)' }}>
@@ -211,10 +282,21 @@ export default function Feed() {
         </>
       )}
 
-      {/* 투표 영역 */}
-      <div onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}
-        style={{ height: videoHeight, transition: 'height 0.35s cubic-bezier(0.4,0,0.2,1)', position: 'relative', overflow: 'hidden' }}>
-        <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', padding: '60px 0 20px' }}>
+      {/* 투표 영역 - 슬라이드 애니메이션 적용 */}
+      <div style={{
+        height: videoHeight,
+        transition: 'height 0.35s cubic-bezier(0.4,0,0.2,1)',
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center',
+          padding: '60px 0 20px',
+          transform: `translateY(${slideOffset}px)`,
+          transition: isAnimating ? 'transform 0.28s cubic-bezier(0.4,0,0.2,1)' : 'none',
+          willChange: 'transform',
+        }}>
           <div style={{ flex: 1, padding: '0 64px 0 20px' }}>
             <div style={{ fontSize: '11px', fontWeight: 800, color: Y, marginBottom: '6px', letterSpacing: '0.04em' }}>{v.category}</div>
             <div style={{ fontSize: sheetOpen ? '16px' : '22px', fontWeight: 900, color: 'white', lineHeight: 1.3, marginBottom: '6px', letterSpacing: '-0.03em', transition: 'font-size 0.3s' }}>{v.question}</div>
@@ -275,11 +357,27 @@ export default function Feed() {
           </div>
         </div>
 
-        {/* 인디케이터 */}
+        {/* 스와이프 힌트 (첫 진입 시) */}
+        {!sheetOpen && votes.length > 1 && (
+          <div style={{ position: 'absolute', bottom: '28px', left: '50%', transform: 'translateX(-50%)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px', opacity: 0.35, pointerEvents: 'none' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><polyline points="18 15 12 9 6 15" /></svg>
+            <div style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'white' }} />
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><polyline points="6 9 12 15 18 9" /></svg>
+          </div>
+        )}
+
+        {/* 인디케이터 (오른쪽 세로) */}
         {!sheetOpen && (
-          <div style={{ position: 'absolute', bottom: '16px', left: '20px', right: '20px', display: 'flex', gap: '4px' }}>
+          <div style={{ position: 'absolute', right: '4px', top: '50%', transform: 'translateY(-50%)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             {votes.map((_, i) => (
-              <div key={i} style={{ flex: 1, height: '2px', borderRadius: '999px', background: i === current ? Y : 'rgba(255,255,255,0.2)', transition: 'all 0.3s' }} />
+              <div key={i} onClick={() => setCurrent(i)} style={{
+                width: '3px',
+                height: i === current ? '20px' : '4px',
+                borderRadius: '999px',
+                background: i === current ? Y : 'rgba(255,255,255,0.2)',
+                transition: 'all 0.3s',
+                cursor: 'pointer',
+              }} />
             ))}
           </div>
         )}
