@@ -378,8 +378,8 @@ export default function Feed() {
 
         {/* 투표 영역 */}
         <div style={{
-          height: sheetOpen ? `${100 - SHEET_H}svh` : '100svh',
-          transition: 'height 0.32s cubic-bezier(0.32,0.72,0,1)',
+        height: sheetOpen ? `${100 - SHEET_H}svh` : '100svh',
+          transition: isSheetDragging ? 'none' : 'height 0.32s cubic-bezier(0.32,0.72,0,1)',
           position: 'relative', overflow: 'hidden',
         }}>
           <div style={{
