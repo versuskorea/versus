@@ -292,7 +292,7 @@ export default function Feed() {
         <div style={{
           position: 'absolute', inset: 0,
           display: 'flex', alignItems: 'center',
-          padding: '60px 0 20px',
+          padding: '60px 0 80px',
           transform: `translateY(${slideOffset}px)`,
           transition: isAnimating ? 'transform 0.28s cubic-bezier(0.4,0,0.2,1)' : 'none',
           willChange: 'transform',
