@@ -411,18 +411,18 @@ export default function Home() {
               <div key={v.id} style={{ margin:'0 14px 10px', borderRadius:'16px', overflow:'hidden', background:CARD, border:'1px solid rgba(255,255,255,0.07)' }}>
 
                 {/* 카드 상단 - 카테고리 + 질문 */}
-                <div style={{ padding:'13px 14px 10px', borderBottom:'0.5px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ padding:'15px 16px 12px', borderBottom:'0.5px solid rgba(255,255,255,0.06)' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'7px' }}>
                     <span
                       onClick={e => { e.stopPropagation(); router.push(`/category/${encodeURIComponent(v.category)}`) }}
-                      style={{ fontSize:'11px', fontWeight:700, color:'rgba(255,255,255,0.45)', cursor:'pointer', letterSpacing:'0.02em' }}>
+                      style={{ fontSize:'13px', fontWeight:700, color:'rgba(255,255,255,0.45)', cursor:'pointer', letterSpacing:'0.02em' }}>
                       {v.category}
                     </span>
                     <span style={{ fontSize:'10px', color:'rgba(255,255,255,0.25)' }}>{timeAgo(v.created_at)}</span>
                   </div>
                   <div
                     onClick={() => router.push(`/vote/${v.id}`)}
-                    style={{ fontSize:'15px', fontWeight:800, color:'white', lineHeight:1.35, letterSpacing:'-0.02em', cursor:'pointer' }}>
+                    style={{ fontSize:'17px', fontWeight:800, color:'white', lineHeight:1.35, letterSpacing:'-0.025em', cursor:'pointer' }}>
                     {v.question}
                   </div>
                 </div>
@@ -436,7 +436,7 @@ export default function Home() {
                     <div key={opt.side}
                       onClick={e => { e.stopPropagation(); handleVote(v.id, opt.side) }}
                       style={{
-                        padding:'12px 14px',
+                        padding:'14px 16px',
                         display:'flex', alignItems:'center', gap:'10px',
                         cursor:isVoted?'default':'pointer',
                         borderRight: idx===0 ? '0.5px solid rgba(255,255,255,0.06)' : 'none',
@@ -447,17 +447,17 @@ export default function Home() {
                       {/* 진행바 배경 */}
                       {isVoted && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:`${opt.pct}%`, background:isVoted===opt.side?(opt.side==='a'?'rgba(255,215,0,0.06)':'rgba(255,59,59,0.06)'):'rgba(255,255,255,0.02)', transition:'width 0.8s' }} />}
                       {/* 이모지 원 */}
-                      <div style={{ width:'38px', height:'38px', borderRadius:'50%', background:'rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'18px', flexShrink:0, position:'relative', border:`1px solid ${isVoted===opt.side?opt.bd:'rgba(255,255,255,0.08)'}` }}>
+                      <div style={{ width:'44px', height:'44px', borderRadius:'50%', background:'rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0, position:'relative', border:`1px solid ${isVoted===opt.side?opt.bd:'rgba(255,255,255,0.08)'}` }}>
                         {opt.emoji}
                       </div>
                       <div style={{ flex:1, position:'relative', minWidth:0 }}>
-                        <div style={{ fontSize:'8px', fontWeight:900, color:isVoted===opt.side?opt.color:'rgba(255,255,255,0.3)', letterSpacing:'0.1em', marginBottom:'3px' }}>{opt.side.toUpperCase()}</div>
-                        <div style={{ fontSize:'13px', fontWeight:800, color:'white', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{opt.name}</div>
+                        <div style={{ fontSize:'10px', fontWeight:900, color:isVoted===opt.side?opt.color:'rgba(255,255,255,0.3)', letterSpacing:'0.1em', marginBottom:'3px' }}>{opt.side.toUpperCase()}</div>
+                        <div style={{ fontSize:'15px', fontWeight:800, color:'white', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{opt.name}</div>
                       </div>
                       {isVoted && (
                         <div style={{ textAlign:'right', position:'relative', flexShrink:0 }}>
-                          <div style={{ fontSize:'18px', fontWeight:900, color:opt.color, lineHeight:1 }}>{opt.pct}%</div>
-                          <div style={{ fontSize:'9px', color:'rgba(255,255,255,0.3)', marginTop:'2px' }}>{fmt(opt.cnt)}명</div>
+                          <div style={{ fontSize:'20px', fontWeight:900, color:opt.color, lineHeight:1 }}>{opt.pct}%</div>
+                          <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.3)', marginTop:'2px' }}>{fmt(opt.cnt)}명</div>
                         </div>
                       )}
                     </div>
@@ -473,26 +473,26 @@ export default function Home() {
                 )}
 
                 {/* 카드 하단 */}
-                <div style={{ padding:'9px 14px', display:'flex', alignItems:'center', justifyContent:'space-between', borderTop:'0.5px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ padding:'11px 16px', display:'flex', alignItems:'center', justifyContent:'space-between', borderTop:'0.5px solid rgba(255,255,255,0.05)' }}>
                   <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-                    <span style={{ fontSize:'11px', color:'rgba(255,255,255,0.35)' }}>👥 {fmt(v.total)}명</span>
-                    {v.total>100 && <span style={{ fontSize:'8px', fontWeight:800, padding:'2px 7px', borderRadius:'999px', background:YS, color:Y }}>인기</span>}
+                    <span style={{ fontSize:'13px', color:'rgba(255,255,255,0.35)' }}>👥 {fmt(v.total)}명</span>
+                    {v.total>100 && <span style={{ fontSize:'10px', fontWeight:800, padding:'3px 9px', borderRadius:'999px', background:YS, color:Y }}>인기</span>}
                   </div>
                   <div style={{ display:'flex', alignItems:'center', gap:'14px' }}>
                     {/* 말풍선 댓글 버튼 */}
                     <div onClick={e => toggleComments(v.id, e)} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer' }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={isCommentOpen?Y:'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={isCommentOpen?Y:'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
                       </svg>
-                      {vComments.length>0 && <span style={{ fontSize:'10px', color:isCommentOpen?Y:'rgba(255,255,255,0.35)', fontWeight:700 }}>{vComments.length}</span>}
+                      {vComments.length>0 && <span style={{ fontSize:'12px', color:isCommentOpen?Y:'rgba(255,255,255,0.35)', fontWeight:700 }}>{vComments.length}</span>}
                     </div>
                     {/* 하트 */}
                     <div onClick={e => handleLike(v.id, e)} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', position:'relative' }}>
                       <HeartBurst active={burstId===v.id} />
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill={liked[v.id]?Y:'none'} stroke={liked[v.id]?Y:'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill={liked[v.id]?Y:'none'} stroke={liked[v.id]?Y:'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
                       </svg>
-                      {(likeCounts[v.id]||0)>0 && <span style={{ fontSize:'10px', fontWeight:800, color:liked[v.id]?Y:'rgba(255,255,255,0.35)' }}>{likeCounts[v.id]}</span>}
+                      {(likeCounts[v.id]||0)>0 && <span style={{ fontSize:'12px', fontWeight:800, color:liked[v.id]?Y:'rgba(255,255,255,0.35)' }}>{likeCounts[v.id]}</span>}
                     </div>
                   </div>
                 </div>
@@ -511,16 +511,16 @@ export default function Home() {
                       ) : vComments.map(c => (
                         <div key={c.id} style={{ display:'flex', gap:'8px', marginBottom:'10px', alignItems:'flex-start' }}>
                           {/* 아바타 */}
-                          <div style={{ width:'22px', height:'22px', borderRadius:'50%', flexShrink:0, background:c.choice==='a'?YS:RS, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', border:`1px solid ${c.choice==='a'?YB:RB}` }}>
+                          <div style={{ width:'26px', height:'26px', borderRadius:'50%', flexShrink:0, background:c.choice==='a'?YS:RS, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', border:`1px solid ${c.choice==='a'?YB:RB}` }}>
                             {c.choice==='a'?v.emoji_a:v.emoji_b}
                           </div>
                           <div style={{ flex:1 }}>
                             <div style={{ marginBottom:'3px' }}>
-                              <span style={{ fontSize:'9px', fontWeight:800, padding:'1px 6px', borderRadius:'4px', background:c.choice==='a'?YS:RS, color:c.choice==='a'?Y:R }}>
+                              <span style={{ fontSize:'11px', fontWeight:800, padding:'2px 8px', borderRadius:'4px', background:c.choice==='a'?YS:RS, color:c.choice==='a'?Y:R }}>
                                 {c.choice==='a'?v.option_a:v.option_b}파
                               </span>
                             </div>
-                            <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.85)', lineHeight:1.45 }}>{c.content}</div>
+                            <div style={{ fontSize:'14px', color:'rgba(255,255,255,0.85)', lineHeight:1.5 }}>{c.content}</div>
                           </div>
                         </div>
                       ))}
@@ -528,7 +528,7 @@ export default function Home() {
                     {/* 입력창 */}
                     <div style={{ padding:'6px 10px 10px', display:'flex', gap:'6px', alignItems:'center', borderTop:'0.5px solid rgba(255,255,255,0.05)' }}>
                       {isVoted && (
-                        <div style={{ width:'24px', height:'24px', borderRadius:'50%', flexShrink:0, background:voted[v.id]==='a'?YS:RS, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px' }}>
+                        <div style={{ width:'28px', height:'28px', borderRadius:'50%', flexShrink:0, background:voted[v.id]==='a'?YS:RS, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'13px' }}>
                           {voted[v.id]==='a'?v.emoji_a:v.emoji_b}
                         </div>
                       )}
@@ -544,7 +544,7 @@ export default function Home() {
                           flex:1, background:'rgba(255,255,255,0.07)',
                           border:'0.5px solid rgba(255,255,255,0.1)',
                           borderRadius:'999px', padding:'8px 12px',
-                          fontSize:'12px', color:isVoted?'white':'rgba(255,255,255,0.3)',
+                          fontSize:'14px', color:isVoted?'white':'rgba(255,255,255,0.3)',
                           outline:'none', fontFamily:font,
                         }}
                       />
@@ -565,7 +565,7 @@ export default function Home() {
 
         {hasMore && !latestLoading && allLatest.length>0 && (
           <div onClick={loadMore} style={{ padding:'16px', textAlign:'center', cursor:'pointer' }}>
-            <div style={{ display:'inline-block', padding:'10px 24px', borderRadius:'999px', border:`1.5px solid ${YB}`, fontSize:'13px', fontWeight:700, color:Y, background:YS }}>더 보기 ↓</div>
+            <div style={{ display:'inline-block', padding:'10px 24px', borderRadius:'999px', border:`1.5px solid ${YB}`, fontSize:'15px', fontWeight:700, color:Y, background:YS }}>더 보기 ↓</div>
           </div>
         )}
         {latestLoading && <div style={{ padding:'16px', textAlign:'center', fontSize:'12px', color:'white', opacity:0.3 }}>불러오는 중...</div>}
