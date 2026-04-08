@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import BottomNav from '@/components/BottomNav'
 import { supabase } from '@/lib/supabase'
+import { CATEGORIES } from '@/lib/categories'
 
 const BG = '#0A0A0A'
 const CARD = '#141414'
@@ -22,10 +23,7 @@ type Vote = {
   is_realtime: boolean; expires_at: string | null; created_at: string
   count_a: number; count_b: number; total: number; pa: number
 }
-type Comment = {
-  id: string; content: string; choice: 'a' | 'b'; created_at: string
-  likes?: number; replies?: Reply[]
-}
+type Comment = { id: string; content: string; choice: 'a' | 'b'; created_at: string }
 type Reply = { id: string; content: string; choice: 'a' | 'b'; created_at: string }
 
 function fmt(n: number) {
@@ -60,10 +58,9 @@ export default function VoteDetail() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [now, setNow] = useState(Date.now())
-  // 댓글 좋아요
+  const [menuOpen, setMenuOpen] = useState(false)
   const [commentLikes, setCommentLikes] = useState<Record<string, number>>({})
   const [likedComments, setLikedComments] = useState<Record<string, boolean>>({})
-  // 대댓글
   const [replyTo, setReplyTo] = useState<string|null>(null)
   const [replyText, setReplyText] = useState('')
   const [replies, setReplies] = useState<Record<string, Reply[]>>({})
@@ -180,33 +177,87 @@ export default function VoteDetail() {
   return (
     <div style={{ maxWidth:'390px', margin:'0 auto', minHeight:'100vh', background:BG, fontFamily:font, paddingBottom:'100px' }}>
 
-      
-        <div style={{ display:'flex', gap:'6px' }}>
+      {/* ── TopBar ── */}
+      <div style={{
+        background:'rgba(10,10,10,0.96)',
+        padding:'10px 16px',
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        borderBottom:'0.5px solid rgba(255,255,255,0.07)',
+        position:'sticky', top:0, zIndex:50,
+        backdropFilter:'blur(10px)',
+      }}>
+        {/* 왼쪽: 뒤로가기 + 로고 */}
+        <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
+          <div onClick={() => router.back()} style={{ width:'34px', height:'34px', borderRadius:'50%', background:CARD, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px', color:'white', cursor:'pointer', flexShrink:0 }}>←</div>
+          <div style={{ fontSize:'18px', fontWeight:900, letterSpacing:'-0.04em', color:'white', display:'flex', alignItems:'center' }}>
+            VERSUS
+            <span style={{ background:Y, color:'#0A0A0A', fontSize:'7px', padding:'2px 5px', borderRadius:'4px', marginLeft:'5px', fontWeight:900 }}>VS</span>
+          </div>
+        </div>
+
+        {/* 오른쪽: 실시간 타이머 + 공유 + 검색 + 햄버거 */}
+        <div style={{ display:'flex', alignItems:'center', gap:'6px' }}>
           {vote.is_realtime && (
-            <div style={{ fontSize:'13px', fontWeight:900, color: expired?'rgba(255,255,255,0.3)':urgent?R:Y, fontVariantNumeric:'tabular-nums', flexShrink:0 }}>
+            <div style={{ fontSize:'13px', fontWeight:900, color: expired?'rgba(255,255,255,0.3)':urgent?R:Y, fontVariantNumeric:'tabular-nums' }}>
               {expired ? '종료' : `⏱${timer(timeLeft)}`}
             </div>
-          )}{/* ── TopBar ── */}
-      <div style={{ background:'rgba(10,10,10,0.96)', padding:'12px 16px', display:'flex', alignItems:'center', gap:'10px', borderBottom:'0.5px solid rgba(255,255,255,0.07)', position:'sticky', top:0, zIndex:50, backdropFilter:'blur(10px)' }}>
-        <div onClick={() => router.back()} style={{ width:'34px', height:'34px', borderRadius:'50%', background:CARD, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px', color:'white', cursor:'pointer', flexShrink:0 }}>←</div>
-        <div style={{ fontSize:'17px', fontWeight:900, letterSpacing:'-0.04em', color:'white', display:'flex', alignItems:'center', gap:'3px' }}>
-          VERSUS
-          <span style={{ background:Y, color:'#0A0A0A', fontSize:'7px', padding:'2px 5px', borderRadius:'4px', marginLeft:'4px', verticalAlign:'middle', fontWeight:900 }}>VS</span>
-        </div>
-        <div style={{ flex:1 }} />
-        <div style={{ display:'flex', gap:'6px' }}>
+          )}
+          <div onClick={handleShare} style={{ width:'32px', height:'32px', borderRadius:'50%', background: shared ? YS : 'rgba(255,255,255,0.08)', border: shared ? `1px solid ${YB}` : 'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s' }}>
+            {shared
+              ? <span style={{ fontSize:'14px' }}>✅</span>
+              : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            }
+          </div>
           <div onClick={() => router.push('/search')} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </div>
-          <div onClick={() => router.push('/')} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+          <div onClick={() => setMenuOpen(true)} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
           </div>
         </div>
-          <div onClick={handleShare} style={{ width:'34px', height:'34px', borderRadius:'50%', background:CARD, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'15px', cursor:'pointer' }}>
-            {shared ? '✅' : '⬆'}
-          </div>
-        </div>
       </div>
+
+      {/* ── 햄버거 메뉴 ── */}
+      {menuOpen && (
+        <>
+          <div onClick={() => setMenuOpen(false)} style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', zIndex:200 }} />
+          <div style={{ position:'fixed', top:0, bottom:0, width:'240px', background:'#1A1A2E', zIndex:201, display:'flex', flexDirection:'column', boxShadow:'-4px 0 24px rgba(0,0,0,0.5)', right:'max(0px, calc(50vw - 195px))' }}>
+            <div style={{ padding:'16px', display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'0.5px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'4px' }}>
+                <span style={{ fontSize:'16px', fontWeight:900, color:'white' }}>VERSUS</span>
+                <span style={{ background:Y, color:'#0A0A0A', fontSize:'7px', padding:'1px 4px', borderRadius:'3px', fontWeight:900 }}>VS</span>
+              </div>
+              <div onClick={() => setMenuOpen(false)} style={{ fontSize:'20px', color:'rgba(255,255,255,0.4)', cursor:'pointer' }}>✕</div>
+            </div>
+            <div style={{ flex:1, overflowY:'auto', padding:'12px 0' }}>
+              <div style={{ fontSize:'10px', fontWeight:800, color:'rgba(255,255,255,0.3)', letterSpacing:'0.08em', padding:'8px 16px 4px' }}>카테고리</div>
+              <div onClick={() => { router.push('/hot'); setMenuOpen(false) }} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'11px 16px', cursor:'pointer', borderBottom:'0.5px solid rgba(255,255,255,0.05)' }}>
+                <span style={{ fontSize:'18px' }}>🔥</span><span style={{ fontSize:'14px', fontWeight:700, color:'white' }}>인기 투표</span>
+              </div>
+              {CATEGORIES.map(cat => (
+                <div key={cat} onClick={() => { router.push(`/category/${encodeURIComponent(cat)}`); setMenuOpen(false) }} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'11px 16px', cursor:'pointer', borderBottom:'0.5px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize:'18px' }}>{cat.split(' ')[0]}</span>
+                  <span style={{ fontSize:'14px', fontWeight:700, color:'white' }}>{cat.split(' ').slice(1).join(' ')}</span>
+                </div>
+              ))}
+              <div style={{ fontSize:'10px', fontWeight:800, color:'rgba(255,255,255,0.3)', letterSpacing:'0.08em', padding:'16px 16px 8px' }}>메뉴</div>
+              {[
+                { label:'홈', path:'/', emoji:'🏠' },
+                { label:'소울픽', path:'/soul', emoji:'🎯' },
+                { label:'투표 만들기', path:'/create', emoji:'✏️' },
+              ].map(item => (
+                <div key={item.path} onClick={() => { router.push(item.path); setMenuOpen(false) }} style={{ display:'flex', alignItems:'center', gap:'12px', padding:'11px 16px', cursor:'pointer', borderBottom:'0.5px solid rgba(255,255,255,0.05)' }}>
+                  <span style={{ fontSize:'18px' }}>{item.emoji}</span>
+                  <span style={{ fontSize:'14px', fontWeight:700, color:'white' }}>{item.label}</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ padding:'14px 16px', borderTop:`3px solid ${Y}`, textAlign:'center' }}>
+              <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.3)' }}>VERSUS · 세상의 모든 A vs B</div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── 포스트 영역 ── */}
       <div style={{ padding:'16px 18px', borderBottom:'6px solid #111' }}>
@@ -235,7 +286,7 @@ export default function VoteDetail() {
           {vote.question}
         </div>
 
-        {/* AB 투표 버튼 - 블라인드 카드 스택 스타일 */}
+        {/* AB 투표 버튼 */}
         <div style={{ display:'flex', flexDirection:'column', gap:'8px', marginBottom:'12px' }}>
           {([
             { side:'a' as const, name:vote.option_a, emoji:vote.emoji_a, pct:vote.pa, cnt:vote.count_a, color:Y, bg:YS, bd:YB },
@@ -250,18 +301,14 @@ export default function VoteDetail() {
               opacity: myChoice && myChoice!==opt.side ? 0.35 : 1,
               transition:'all 0.2s', position:'relative', overflow:'hidden',
             }}>
-              {/* 진행바 배경 */}
               {showResult && <div style={{ position:'absolute', left:0, top:0, bottom:0, width:`${opt.pct}%`, background: myChoice===opt.side ? (opt.side==='a'?'rgba(255,215,0,0.07)':'rgba(255,59,59,0.07)') : 'rgba(255,255,255,0.02)', transition:'width 0.8s', borderRadius:'14px' }} />}
-              {/* 이모지 원 */}
               <div style={{ width:'44px', height:'44px', borderRadius:'50%', background:'rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'22px', flexShrink:0, position:'relative' }}>
                 {opt.emoji}
               </div>
-              {/* 텍스트 */}
               <div style={{ flex:1, position:'relative' }}>
                 <div style={{ fontSize:'9px', fontWeight:900, color:myChoice===opt.side?opt.color:'rgba(255,255,255,0.35)', letterSpacing:'0.08em', marginBottom:'3px' }}>{opt.side.toUpperCase()}</div>
                 <div style={{ fontSize:'15px', fontWeight:800, color:'white' }}>{opt.name}</div>
               </div>
-              {/* 퍼센트 */}
               {showResult && (
                 <div style={{ textAlign:'right', position:'relative', flexShrink:0 }}>
                   <div style={{ fontSize:'22px', fontWeight:900, color:opt.color, lineHeight:1 }}>{opt.pct}%</div>
@@ -283,27 +330,18 @@ export default function VoteDetail() {
         {/* 하단 액션 */}
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
           <div style={{ display:'flex', gap:'14px' }}>
-            <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:'4px' }}>
-              👥 {fmt(vote.total)}명
-            </div>
-            <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:'4px' }}>
-              💬 {comments.length}
-            </div>
+            <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:'4px' }}>👥 {fmt(vote.total)}명</div>
+            <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:'4px' }}>💬 {comments.length}</div>
           </div>
-          <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
-            <div onClick={handleShare} style={{ fontSize:'12px', color:'rgba(255,255,255,0.3)', cursor:'pointer' }}>⬆ 공유</div>
-            <div onClick={handleLikeVote} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', padding:'5px 12px', borderRadius:'999px', background: liked ? YS : 'rgba(255,255,255,0.05)', border:`1px solid ${liked ? YB : 'rgba(255,255,255,0.08)'}`, transition:'all 0.2s' }}>
-              <span style={{ fontSize:'14px' }}>{liked ? '♥' : '♡'}</span>
-              <span style={{ fontSize:'12px', fontWeight:700, color: liked ? Y : 'rgba(255,255,255,0.4)' }}>{likeCount > 0 ? likeCount : ''}</span>
-            </div>
+          <div onClick={handleLikeVote} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', padding:'5px 12px', borderRadius:'999px', background: liked ? YS : 'rgba(255,255,255,0.05)', border:`1px solid ${liked ? YB : 'rgba(255,255,255,0.08)'}`, transition:'all 0.2s' }}>
+            <span style={{ fontSize:'14px' }}>{liked ? '♥' : '♡'}</span>
+            <span style={{ fontSize:'12px', fontWeight:700, color: liked ? Y : 'rgba(255,255,255,0.4)' }}>{likeCount > 0 ? likeCount : ''}</span>
           </div>
         </div>
       </div>
 
       {/* ── 댓글 섹션 ── */}
       <div style={{ background:BG }}>
-
-        {/* 댓글 헤더 + 필터 */}
         <div style={{ padding:'14px 18px 10px', display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'0.5px solid rgba(255,255,255,0.06)' }}>
           <span style={{ fontSize:'14px', fontWeight:800, color:'white' }}>댓글 {comments.length}</span>
           <div style={{ display:'flex', gap:'6px' }}>
@@ -319,7 +357,6 @@ export default function VoteDetail() {
           </div>
         </div>
 
-        {/* 댓글 목록 */}
         {filtered.length === 0 ? (
           <div style={{ padding:'40px 18px', textAlign:'center', fontSize:'13px', color:'rgba(255,255,255,0.3)' }}>
             {myChoice ? '첫 댓글을 달아보세요!' : '투표 후 댓글을 달 수 있어요'}
@@ -329,10 +366,8 @@ export default function VoteDetail() {
           const cLiked = likedComments[c.id] || false
           const cReplies = replies[c.id] || []
           const isReplyOpen = replyTo === c.id
-
           return (
             <div key={c.id} style={{ padding:'14px 18px', borderBottom:'0.5px solid rgba(255,255,255,0.05)' }}>
-              {/* 댓글 헤더 */}
               <div style={{ display:'flex', alignItems:'flex-start', gap:'9px', marginBottom:'7px' }}>
                 <div style={{ width:'30px', height:'30px', borderRadius:'50%', flexShrink:0, background: c.choice==='a' ? YS : RS, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', border:`1px solid ${c.choice==='a' ? YB : 'rgba(255,59,59,0.3)'}` }}>
                   {c.choice==='a' ? vote.emoji_a : vote.emoji_b}
@@ -347,13 +382,7 @@ export default function VoteDetail() {
                   </div>
                 </div>
               </div>
-
-              {/* 댓글 내용 */}
-              <div style={{ fontSize:'14px', color:'rgba(255,255,255,0.88)', lineHeight:1.55, paddingLeft:'39px', marginBottom:'8px' }}>
-                {c.content}
-              </div>
-
-              {/* 댓글 액션 */}
+              <div style={{ fontSize:'14px', color:'rgba(255,255,255,0.88)', lineHeight:1.55, paddingLeft:'39px', marginBottom:'8px' }}>{c.content}</div>
               <div style={{ display:'flex', gap:'14px', paddingLeft:'39px' }}>
                 <div onClick={() => handleLikeComment(c.id)} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer' }}>
                   <span style={{ fontSize:'13px', color: cLiked ? Y : 'rgba(255,255,255,0.3)' }}>{cLiked ? '♥' : '♡'}</span>
@@ -364,10 +393,7 @@ export default function VoteDetail() {
                     💬 {cReplies.length > 0 ? `대댓글 ${cReplies.length}` : '대댓글'}
                   </span>
                 </div>
-                <div style={{ fontSize:'11px', color:'rgba(255,255,255,0.2)', cursor:'pointer' }}>···</div>
               </div>
-
-              {/* 대댓글 목록 */}
               {cReplies.length > 0 && (
                 <div style={{ marginTop:'10px', paddingLeft:'39px' }}>
                   {cReplies.map(r => (
@@ -387,18 +413,13 @@ export default function VoteDetail() {
                   ))}
                 </div>
               )}
-
-              {/* 대댓글 입력 */}
               {isReplyOpen && (
                 <div style={{ marginTop:'8px', paddingLeft:'39px', display:'flex', gap:'6px', alignItems:'center' }}>
-                  <input
-                    value={replyText}
-                    onChange={e => setReplyText(e.target.value)}
+                  <input value={replyText} onChange={e => setReplyText(e.target.value)}
                     placeholder={myChoice ? `${myChoice==='a'?vote.option_a:vote.option_b}파로 대댓글...` : '투표 먼저!'}
                     disabled={!myChoice}
                     onKeyDown={e => e.key==='Enter' && addReply(c.id, replyText)}
-                    style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:'999px', padding:'8px 12px', fontSize:'12px', color:'white', outline:'none', fontFamily:font }}
-                  />
+                    style={{ flex:1, background:'rgba(255,255,255,0.06)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:'999px', padding:'8px 12px', fontSize:'16px', color:'white', outline:'none', fontFamily:font }} />
                   <div onClick={() => addReply(c.id, replyText)} style={{ width:'30px', height:'30px', borderRadius:'50%', flexShrink:0, background: replyText&&myChoice ? Y : 'rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s' }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={replyText&&myChoice?'#0A0A0A':'rgba(255,255,255,0.3)'} strokeWidth="2.5" strokeLinecap="round">
                       <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>
@@ -425,7 +446,7 @@ export default function VoteDetail() {
             placeholder={myChoice ? `${myChoice==='a'?vote.option_a:vote.option_b}파로 댓글 달기...` : '투표 후 댓글 달 수 있어요'}
             disabled={!myChoice}
             onKeyDown={e => e.key==='Enter' && handleComment()}
-            style={{ flex:1, background:'rgba(255,255,255,0.07)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:'22px', padding:'10px 14px', fontSize:'13px', color: myChoice?'white':'rgba(255,255,255,0.3)', outline:'none', fontFamily:font }}
+            style={{ flex:1, background:'rgba(255,255,255,0.07)', border:'0.5px solid rgba(255,255,255,0.1)', borderRadius:'22px', padding:'10px 14px', fontSize:'16px', color: myChoice?'white':'rgba(255,255,255,0.3)', outline:'none', fontFamily:font }}
           />
           <div onClick={handleComment} style={{ width:'36px', height:'36px', borderRadius:'50%', flexShrink:0, background: comment&&myChoice ? Y : 'rgba(255,255,255,0.07)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={comment&&myChoice?'#0A0A0A':'rgba(255,255,255,0.3)'} strokeWidth="2.5" strokeLinecap="round">
