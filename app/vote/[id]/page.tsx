@@ -180,18 +180,28 @@ export default function VoteDetail() {
   return (
     <div style={{ maxWidth:'390px', margin:'0 auto', minHeight:'100vh', background:BG, fontFamily:font, paddingBottom:'100px' }}>
 
-      {/* ── TopBar ── */}
-      <div style={{ background:'rgba(10,10,10,0.96)', padding:'12px 16px', display:'flex', alignItems:'center', gap:'10px', borderBottom:'0.5px solid rgba(255,255,255,0.07)', position:'sticky', top:0, zIndex:50, backdropFilter:'blur(10px)' }}>
-        <div onClick={() => router.back()} style={{ width:'34px', height:'34px', borderRadius:'50%', background:CARD, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px', color:'white', cursor:'pointer', flexShrink:0 }}>←</div>
-        <div style={{ flex:1, overflow:'hidden' }}>
-          <div style={{ fontSize:'15px', fontWeight:800, color:'white', letterSpacing:'-0.02em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{vote.question}</div>
-        </div>
+      
         <div style={{ display:'flex', gap:'6px' }}>
           {vote.is_realtime && (
             <div style={{ fontSize:'13px', fontWeight:900, color: expired?'rgba(255,255,255,0.3)':urgent?R:Y, fontVariantNumeric:'tabular-nums', flexShrink:0 }}>
               {expired ? '종료' : `⏱${timer(timeLeft)}`}
             </div>
-          )}
+          )}{/* ── TopBar ── */}
+      <div style={{ background:'rgba(10,10,10,0.96)', padding:'12px 16px', display:'flex', alignItems:'center', gap:'10px', borderBottom:'0.5px solid rgba(255,255,255,0.07)', position:'sticky', top:0, zIndex:50, backdropFilter:'blur(10px)' }}>
+        <div onClick={() => router.back()} style={{ width:'34px', height:'34px', borderRadius:'50%', background:CARD, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'16px', color:'white', cursor:'pointer', flexShrink:0 }}>←</div>
+        <div style={{ fontSize:'17px', fontWeight:900, letterSpacing:'-0.04em', color:'white', display:'flex', alignItems:'center', gap:'3px' }}>
+          VERSUS
+          <span style={{ background:Y, color:'#0A0A0A', fontSize:'7px', padding:'2px 5px', borderRadius:'4px', marginLeft:'4px', verticalAlign:'middle', fontWeight:900 }}>VS</span>
+        </div>
+        <div style={{ flex:1 }} />
+        <div style={{ display:'flex', gap:'6px' }}>
+          <div onClick={() => router.push('/search')} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </div>
+          <div onClick={() => router.push('/')} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </div>
+        </div>
           <div onClick={handleShare} style={{ width:'34px', height:'34px', borderRadius:'50%', background:CARD, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'15px', cursor:'pointer' }}>
             {shared ? '✅' : '⬆'}
           </div>
