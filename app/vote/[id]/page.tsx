@@ -202,12 +202,7 @@ export default function VoteDetail() {
               {expired ? '종료' : `⏱${timer(timeLeft)}`}
             </div>
           )}
-          <div onClick={handleShare} style={{ width:'32px', height:'32px', borderRadius:'50%', background: shared ? YS : 'rgba(255,255,255,0.08)', border: shared ? `1px solid ${YB}` : 'none', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s' }}>
-            {shared
-              ? <span style={{ fontSize:'14px' }}>✅</span>
-              : <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            }
-          </div>
+        
           <div onClick={() => router.push('/search')} style={{ width:'32px', height:'32px', borderRadius:'50%', background:'rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           </div>
@@ -333,9 +328,15 @@ export default function VoteDetail() {
             <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:'4px' }}>👥 {fmt(vote.total)}명</div>
             <div style={{ fontSize:'12px', color:'rgba(255,255,255,0.35)', display:'flex', alignItems:'center', gap:'4px' }}>💬 {comments.length}</div>
           </div>
-          <div onClick={handleLikeVote} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', padding:'5px 12px', borderRadius:'999px', background: liked ? YS : 'rgba(255,255,255,0.05)', border:`1px solid ${liked ? YB : 'rgba(255,255,255,0.08)'}`, transition:'all 0.2s' }}>
-            <span style={{ fontSize:'14px' }}>{liked ? '♥' : '♡'}</span>
-            <span style={{ fontSize:'12px', fontWeight:700, color: liked ? Y : 'rgba(255,255,255,0.4)' }}>{likeCount > 0 ? likeCount : ''}</span>
+          <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
+            <div onClick={handleShare} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', fontSize:'12px', color: shared ? Y : 'rgba(255,255,255,0.35)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={shared ? Y : 'rgba(255,255,255,0.35)'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              {shared ? '복사됨' : '공유'}
+            </div>
+            <div onClick={handleLikeVote} style={{ display:'flex', alignItems:'center', gap:'4px', cursor:'pointer', padding:'5px 12px', borderRadius:'999px', background: liked ? YS : 'rgba(255,255,255,0.05)', border:`1px solid ${liked ? YB : 'rgba(255,255,255,0.08)'}`, transition:'all 0.2s' }}>
+              <span style={{ fontSize:'14px' }}>{liked ? '♥' : '♡'}</span>
+              <span style={{ fontSize:'12px', fontWeight:700, color: liked ? Y : 'rgba(255,255,255,0.4)' }}>{likeCount > 0 ? likeCount : ''}</span>
+            </div>
           </div>
         </div>
       </div>
